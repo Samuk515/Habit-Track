@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
       <?php endif; ?>
 
-      <form method="POST" action="login.php">
+      <form method="POST" action="login.php" id="login-form">
         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
         <div class="field"><input type="email" name="email" placeholder="Email" required></div>
         <div class="field"><input type="password" name="password" placeholder="Password" required></div>
@@ -69,5 +69,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="form-footer">Don't have an account? <a href="register.php">Register</a></div>
     </div>
   </div>
+  <script src="assets/js/auth.js"></script>
 </body>
 </html>

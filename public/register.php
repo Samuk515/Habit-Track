@@ -75,17 +75,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
       <?php endif; ?>
 
-      <form method="POST" action="register.php">
+      <div id="client-error-box" class="error-box" style="display:none;"></div>
+
+      <form method="POST" action="register.php" id="register-form">
         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-        <div class="field"><input type="text" name="name" placeholder="Full name" required></div>
-        <div class="field"><input type="email" name="email" placeholder="Email" required></div>
-        <div class="field"><input type="password" name="password" placeholder="Password" required></div>
-        <div class="field"><input type="password" name="confirm_password" placeholder="Confirm password" required></div>
+        <div class="field"><input type="text" name="name" id="name" placeholder="Full name" required></div>
+        <div class="field"><input type="email" name="email" id="email" placeholder="Email" required></div>
+
+        <div class="field password-wrap">
+          <input type="password" name="password" id="password" placeholder="Password" required>
+          <button type="button" class="toggle-password" data-target="password">Show</button>
+        </div>
+
+        <div class="field password-wrap">
+          <input type="password" name="confirm_password" id="confirm_password" placeholder="Confirm password" required>
+          <button type="button" class="toggle-password" data-target="confirm_password">Show</button>
+        </div>
+        <div id="password-match-hint" class="field-hint"></div>
+
         <button type="submit" class="btn-primary">Register</button>
       </form>
 
       <div class="form-footer">Already have an account? <a href="login.php">Login</a></div>
     </div>
   </div>
+  <script src="assets/js/auth.js"></script>
 </body>
 </html>
