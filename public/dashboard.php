@@ -12,11 +12,11 @@ requireLogin();
   <div class="app-layout">
     <div class="sidebar">
       <?php require '../includes/logo.php'; ?>
-      <div class="nav-item active">Dashboard</div>
-      <div class="nav-item">Habits</div>
-      <div class="nav-item">Categories</div>
+      <a href="dashboard.php" class="nav-item active">Dashboard</a>
+      <a href="habits.php" class="nav-item">Habits</a>
+      <a href="categories.php" class="nav-item">Categories</a>
       <div style="margin-top:auto;">
-        <div class="nav-item"><a href="logout.php" style="color:inherit;text-decoration:none;">Logout</a></div>
+        <a href="logout.php" class="nav-item">Logout</a>
       </div>
     </div>
     <div class="main-content">
