@@ -74,27 +74,38 @@ $categories = $stmt->fetchAll();
         <div class="error-box"><?php echo htmlspecialchars($err); ?></div>
       <?php endforeach; ?>
 
-      <form method="POST" action="categories.php">
-        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-        <input type="hidden" name="action" value="add">
-        <input type="text" name="category_name" placeholder="Category name" required>
-        <input type="text" name="description" placeholder="Description (optional)">
-        <button type="submit">Add Category</button>
-      </form>
+      <div class="auth-card" style="max-width:500px;margin-bottom:24px;">
+        <form method="POST" action="categories.php">
+          <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+          <input type="hidden" name="action" value="add">
+          <div class="field"><input type="text" name="category_name" placeholder="Category name" required></div>
+          <div class="field"><input type="text" name="description" placeholder="Description (optional)"></div>
+          <button type="submit" class="btn-primary">Add Category</button>
+        </form>
+      </div>
 
-      <ul>
+      <?php if (empty($categories)): ?>
+        <div class="empty-state"><p>No categories yet.</p></div>
+      <?php else: ?>
+        <div style="display:flex;flex-direction:column;gap:10px;">
         <?php foreach ($categories as $cat): ?>
-          <li>
-            <?php echo htmlspecialchars($cat['category_name']); ?>
-            <form method="POST" action="categories.php" style="display:inline;">
+          <div class="auth-card" style="max-width:500px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-weight:600;"><?php echo htmlspecialchars($cat['category_name']); ?></div>
+              <?php if (!empty($cat['description'])): ?>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px;"><?php echo htmlspecialchars($cat['description']); ?></div>
+              <?php endif; ?>
+            </div>
+            <form method="POST" action="categories.php">
               <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
               <input type="hidden" name="action" value="delete">
               <input type="hidden" name="category_id" value="<?php echo $cat['category_id']; ?>">
-              <button type="submit">Delete</button>
+              <button type="submit" style="background:none;border:1px solid var(--border);color:var(--coral);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;">Delete</button>
             </form>
-          </li>
+          </div>
         <?php endforeach; ?>
-      </ul>
+        </div>
+      <?php endif; ?>
     </div>
   </div>
 </body>
