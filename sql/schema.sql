@@ -13,3 +13,16 @@ CREATE TABLE CATEGORY (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES USER(user_id) ON DELETE CASCADE
 );
+CREATE TABLE HABIT_LOG (
+  log_id INT AUTO_INCREMENT PRIMARY KEY,
+  habit_id INT NOT NULL,
+  subhabit_id INT NULL,
+  log_date DATE NOT NULL,
+  value INT NULL,
+  unit VARCHAR(30) NULL,
+  status ENUM('done','skipped','partial') NOT NULL DEFAULT 'done',
+  notes VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (habit_id) REFERENCES HABIT(habit_id) ON DELETE CASCADE,
+  UNIQUE KEY unique_habit_per_day (habit_id, log_date)
+);

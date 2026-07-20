@@ -175,3 +175,71 @@ h1 { font-size: 20px; margin-bottom: 6px; }
   padding: 60px 20px;
   color: var(--muted);
 }
+
+.habit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  max-width: 900px;
+}
+
+.habit-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.04);
+}
+
+.habit-card-done {
+  border-color: rgba(29, 209, 161, 0.45);
+  background: #F2FFFB;
+}
+
+.habit-card-title {
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.habit-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.habit-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.habit-toggle {
+  min-width: 106px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--text);
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.habit-toggle:hover {
+  border-color: var(--purple);
+  color: var(--purple-dark);
+}
+
+.habit-toggle.is-done {
+  border-color: var(--success);
+  background: var(--success);
+  color: #fff;
+}
