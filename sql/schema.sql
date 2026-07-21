@@ -26,3 +26,10 @@ CREATE TABLE HABIT_LOG (
   FOREIGN KEY (habit_id) REFERENCES HABIT(habit_id) ON DELETE CASCADE,
   UNIQUE KEY unique_habit_per_day (habit_id, log_date)
 );
+CREATE TABLE STREAK (
+  streak_id INT AUTO_INCREMENT PRIMARY KEY,
+  habit_id INT NOT NULL UNIQUE,
+  current_streak INT NOT NULL DEFAULT 0,
+  longest_streak INT NOT NULL DEFAULT 0,
+  FOREIGN KEY (habit_id) REFERENCES HABIT(habit_id) ON DELETE CASCADE
+);

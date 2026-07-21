@@ -2,6 +2,7 @@
 require '../includes/auth.php';
 requireLogin();
 require '../includes/csrf.php';
+require '../includes/functions.php';
 require __DIR__ . '/../config/db.php';
 
 $userId = $_SESSION['user_id'];
@@ -46,6 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $insertStmt->execute([$habitId]);
             }
 
+            calculateAndSaveStreak($pdo, (int) $habitId);
+
             header('Location: dashboard.php');
             exit;
         }
@@ -54,10 +57,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $stmt = $pdo->prepare('SELECT
     HABIT.habit_id, HABIT.habit_name, HABIT.habit_nature,
     CATEGORY.category_name,
-    HABIT_LOG.status AS today_status
+    HABIT_LOG.status AS today_status,
+    COALESCE(STREAK.current_streak, 0) AS current_streak
   FROM HABIT
   INNER JOIN CATEGORY ON HABIT.category_id = CATEGORY.category_id
   LEFT JOIN HABIT_LOG ON HABIT_LOG.habit_id = HABIT.habit_id AND HABIT_LOG.log_date = CURDATE()
+  LEFT JOIN STREAK ON STREAK.habit_id = HABIT.habit_id
   WHERE CATEGORY.user_id = ?
   ORDER BY HABIT.created_at DESC');
 $stmt->execute([$userId]);
@@ -83,10 +88,11 @@ $habits = $stmt->fetchAll();
     <div class="main-content">
       <div class="page-header">
         <h1>Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></h1>
-        <?php foreach ($errors as $err): ?>
-          <div class="error-box"><?php echo htmlspecialchars($err); ?></div>
-        <?php endforeach; ?>
       </div>
+
+      <?php foreach ($errors as $err): ?>
+        <div class="error-box"><?php echo htmlspecialchars($err); ?></div>
+      <?php endforeach; ?>
 
       <?php if (empty($habits)): ?>
         <div class="empty-state">
@@ -98,6 +104,9 @@ $habits = $stmt->fetchAll();
             <?php $isDone = $h['today_status'] === 'done'; ?>
             <div class="auth-card" style="padding:16px 18px;">
               <div style="font-size:11px;color:var(--muted);margin-bottom:6px;"><?php echo htmlspecialchars($h['category_name']); ?></div>
+              <?php if ($h['current_streak'] > 0): ?>
+                <div style="font-size:12px;color:#BA7517;font-weight:600;margin-bottom:6px;">🔥 <?php echo (int) $h['current_streak']; ?></div>
+              <?php endif; ?>
               <div style="font-weight:600;margin-bottom:14px;"><?php echo htmlspecialchars($h['habit_name']); ?></div>
               <form method="POST" action="dashboard.php">
                 <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
