@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) { die('Invalid request.'); }
 
   // 2. Grab and trim inputs from $_POST
-  $name = trim($_POST['name'] ?? '');
+  $name = trim($_POST['name'] ?? ''); 
   $email = strtolower(trim($_POST['email'] ?? ''));
   $password = $_POST['password'] ?? '';
   $confirm_password = $_POST['confirm_password'] ?? '';

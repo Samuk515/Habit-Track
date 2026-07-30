@@ -180,6 +180,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="habit_id" value="<?php echo $h['habit_id']; ?>">
                 <a href="subtasks.php?habit_id=<?php echo $h['habit_id']; ?>" style="margin-right:10px;color:var(--purple);font-size:13px;font-weight:600;">Manage subtasks</a>
+                <?php if ($h['habit_nature'] === 'bad'): ?>
+                  <a href="bad-habit-progress.php?habit_id=<?php echo $h['habit_id']; ?>" style="margin-right:10px;color:var(--coral);font-size:13px;font-weight:600;">Log progress</a>
+                <?php endif; ?>
                 <button type="submit" style="background:none;border:1px solid var(--border);color:var(--coral);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;">Delete</button>
               </form>
             </div>

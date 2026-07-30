@@ -116,6 +116,9 @@ $habits = $stmt->fetchAll();
                   <?php echo $isDone ? '✓ Done' : 'Mark done'; ?>
                 </button>
               </form>
+              <?php if ($h['habit_nature'] === 'bad'): ?>
+                <a href="bad-habit-progress.php?habit_id=<?php echo $h['habit_id']; ?>" style="display:block;text-align:center;margin-top:10px;font-size:13px;font-weight:600;">Log occurrence</a>
+              <?php endif; ?>
             </div>
           <?php endforeach; ?>
         </div>

@@ -77,17 +77,17 @@ function setupRegisterForm() { // Sets up the registration form validation and p
       errors.push('Passwords do not match.');
     }
 
-    if (errors.length > 0) {
+    if (errors.length > 0) { // If there are validation errors, prevent form submission and show errors
       e.preventDefault();
-      showClientErrors(errors);
+      showClientErrors(errors);// Show the validation errors in the error box
       return;
     }
 
     showClientErrors([]);
-    lockSubmitButton(form);
+    lockSubmitButton(form);// Disable the submit button to prevent multiple submissions
   });
 }
-
+// sets up the login form validation and disables the submit button on submission
 function setupLoginForm() {
   var form = document.getElementById('login-form');
   if (!form) return;
