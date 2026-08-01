@@ -72,7 +72,7 @@ $habits = $stmt->fetchAll();
 <html>
 <head>
   <title>Dashboard — Habit Track</title>
-  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260801-2">
 </head>
 <body>
   <div class="app-layout">
