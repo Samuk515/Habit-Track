@@ -1,6 +1,6 @@
 <?php
-require '../includes/csrf.php';
-require_once __DIR__ . '/../includes/functions.php';
+require __DIR__ . '/../../includes/csrf.php'; // redirects to login.php if not logged in
+require_once __DIR__ . '/../../includes/functions.php'; // for redirect()
 session_start();
 
 $errors = [];
@@ -8,7 +8,7 @@ $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   // 1. Verify CSRF token
-  if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) { die('Invalid request.'); }
+  if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) { die('Invalid request.'); } 
 
   // 2. Grab and normalize inputs
   $email = strtolower(trim($_POST['email'] ?? ''));
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   // 4 & 5. Lookup user and verify password
   if (empty($errors)) {
-    require __DIR__ . '/../config/db.php';
+    require __DIR__ . '/../../includes/db.php';
     $stmt = $pdo->prepare('SELECT user_id, name, password FROM USER WHERE email = ?');
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -42,12 +42,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html>
 <head>
   <title>Login — Habit Track</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=20260801-2">
+  <link rel="stylesheet" href="auth.css?v=20260801-2">
 </head>
 <body>
   <div class="auth-wrap">
     <div class="auth-card">
-      <?php require '../includes/logo.php'; ?>
+      <?php require __DIR__ . '/../../includes/logo.php'; ?>
       <h1>Welcome back</h1>
       <p class="subtitle">Log in to continue your streaks.</p>
 
@@ -69,6 +69,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="form-footer">Don't have an account? <a href="register.php">Register</a></div>
     </div>
   </div>
-  <script src="assets/js/auth.js"></script>
+  <script src="auth.js"></script>
 </body>
 </html>

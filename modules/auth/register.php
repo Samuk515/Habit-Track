@@ -1,6 +1,6 @@
 <?php
-require '../includes/csrf.php';
-require_once __DIR__ . '/../includes/functions.php';
+require __DIR__ . '/../../includes/csrf.php';
+require_once __DIR__ . '/../../includes/functions.php';
 session_start();
 
 $errors = [];
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   // 4. If no validation errors so far, check for duplicate email
   if (empty($errors)) {
-    require __DIR__ . '/../config/db.php';
+    require __DIR__ . '/../../includes/db.php';
     $stmt = $pdo->prepare('SELECT user_id FROM USER WHERE email = ?');
     $stmt->execute([$email]);
     if ($stmt->fetch()) {
@@ -58,12 +58,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html>
 <head>
   <title>Register — Habit Track</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=20260801-2">
+  <link rel="stylesheet" href="auth.css?v=20260801-2">
 </head>
 <body>
   <div class="auth-wrap">
     <div class="auth-card">
-      <?php require '../includes/logo.php'; ?>
+      <?php require __DIR__ . '/../../includes/logo.php'; ?>
       <h1>Create your account</h1>
       <p class="subtitle">Start tracking your habits today.</p>
 
@@ -99,6 +99,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="form-footer">Already have an account? <a href="login.php">Login</a></div>
     </div>
   </div>
-  <script src="assets/js/auth.js"></script>
+  <script src="auth.js"></script>
 </body>
 </html>

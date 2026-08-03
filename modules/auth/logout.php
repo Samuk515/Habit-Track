@@ -17,5 +17,5 @@ if (ini_get("session.use_cookies")) { // Check if session cookies are being used
 session_destroy();
 
 // 4. Redirect to login
-require_once __DIR__ . '/../includes/functions.php'; // require once stope php with an error if the file is not found
+require_once __DIR__ . '/../../includes/functions.php'; // require once stope php with an error if the file is not found
 redirect('login.php');

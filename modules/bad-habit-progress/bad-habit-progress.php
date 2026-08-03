@@ -1,8 +1,8 @@
 <?php
-require '../includes/auth.php';
+require __DIR__ . '/../../includes/auth.php';
 requireLogin();
-require '../includes/csrf.php';
-require __DIR__ . '/../config/db.php';
+require __DIR__ . '/../../includes/csrf.php';
+require __DIR__ . '/../../includes/db.php';
 
 $userId = $_SESSION['user_id'];
 $errors = [];
@@ -116,12 +116,12 @@ $progressEntries = $progressStmt->fetchAll();
 <html>
 <head>
   <title>Progress — Habit Track</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=20260801-2">
+  <link rel="stylesheet" href="bad-habit-progress.css?v=20260801-2">
 </head>
 <body>
   <div class="app-layout">
     <div class="sidebar">
-      <?php require '../includes/logo.php'; ?>
+      <?php require __DIR__ . '/../../includes/logo.php'; ?>
       <a href="dashboard.php" class="nav-item">Dashboard</a>
       <a href="habits.php" class="nav-item active">Habits</a>
       <a href="categories.php" class="nav-item">Categories</a>

@@ -1,9 +1,9 @@
 <?php
-require '../includes/auth.php';
+require __DIR__ . '/../../includes/auth.php';
 requireLogin();
-require '../includes/csrf.php';
-require '../includes/functions.php';
-require __DIR__ . '/../config/db.php';
+require __DIR__ . '/../../includes/csrf.php';
+require __DIR__ . '/../../includes/functions.php';
+require __DIR__ . '/../../includes/db.php';
 
 $userId = $_SESSION['user_id'];
 $errors = [];
@@ -72,12 +72,12 @@ $habits = $stmt->fetchAll();
 <html>
 <head>
   <title>Dashboard — Habit Track</title>
-  <link rel="stylesheet" href="assets/css/style.css?v=20260801-2">
+  <link rel="stylesheet" href="dashboard.css?v=20260801-2">
 </head>
 <body>
   <div class="app-layout">
     <div class="sidebar">
-      <?php require '../includes/logo.php'; ?>
+      <?php require __DIR__ . '/../../includes/logo.php'; ?>
       <a href="dashboard.php" class="nav-item active">Dashboard</a>
       <a href="habits.php" class="nav-item">Habits</a>
       <a href="categories.php" class="nav-item">Categories</a>
