@@ -98,11 +98,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
-      <a href="dashboard.php" class="nav-item">Dashboard</a>
+      <a href="../dashboard/dashboard.php" class="nav-item">Dashboard</a>
       <a href="habits.php" class="nav-item active">Habits</a>
-      <a href="categories.php" class="nav-item">Categories</a>
+      <a href="../categories/categories.php" class="nav-item">Categories</a>
       <div style="margin-top:auto;">
-        <a href="logout.php" class="nav-item">Logout</a>
+        <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
     </div>
     <div class="main-content">
@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if (empty($categories)): ?>
           <div class="empty-state" style="flex:1;">
             <p>You need at least one category before adding a habit.</p>
-            <a href="categories.php">Create a category →</a>
+            <a href="../categories/categories.php">Create a category →</a>
           </div>
         <?php else: ?>
           <div class="auth-card" style="flex:0 0 420px;">
@@ -178,9 +178,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   <div style="font-size:12px;color:var(--muted);margin-top:2px;"><?php echo htmlspecialchars($h['category_name']); ?></div>
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;">
-                  <a href="subtasks.php?habit_id=<?php echo $h['habit_id']; ?>" style="color:var(--purple);font-size:13px;font-weight:600;">Manage subtasks</a>
+                  <a href="../subtasks/subtasks.php?habit_id=<?php echo $h['habit_id']; ?>" style="color:var(--purple);font-size:13px;font-weight:600;">Manage subtasks</a>
                   <?php if ($h['habit_nature'] === 'bad'): ?>
-                    <a href="bad-habit-progress.php?habit_id=<?php echo $h['habit_id']; ?>" style="color:var(--coral);font-size:13px;font-weight:600;">Log progress</a>
+                    <a href="../bad-habit-progress/bad-habit-progress.php?habit_id=<?php echo $h['habit_id']; ?>" style="color:var(--coral);font-size:13px;font-weight:600;">Log progress</a>
                   <?php endif; ?>
                   <form method="POST" action="habits.php">
                     <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">

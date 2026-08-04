@@ -60,11 +60,11 @@ $categories = $stmt->fetchAll();
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
-      <a href="dashboard.php" class="nav-item">Dashboard</a>
-      <a href="habits.php" class="nav-item">Habits</a>
+      <a href="../dashboard/dashboard.php" class="nav-item">Dashboard</a>
+      <a href="../habits/habits.php" class="nav-item">Habits</a>
       <a href="categories.php" class="nav-item active">Categories</a>
       <div style="margin-top:auto;">
-        <a href="logout.php" class="nav-item">Logout</a>
+        <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
     </div>
     <div class="main-content">

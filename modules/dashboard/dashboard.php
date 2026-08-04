@@ -79,10 +79,10 @@ $habits = $stmt->fetchAll();
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
       <a href="dashboard.php" class="nav-item active">Dashboard</a>
-      <a href="habits.php" class="nav-item">Habits</a>
-      <a href="categories.php" class="nav-item">Categories</a>
+      <a href="../habits/habits.php" class="nav-item">Habits</a>
+      <a href="../categories/categories.php" class="nav-item">Categories</a>
       <div style="margin-top:auto;">
-        <a href="logout.php" class="nav-item">Logout</a>
+        <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
     </div>
     <div class="main-content">
@@ -96,7 +96,7 @@ $habits = $stmt->fetchAll();
 
       <?php if (empty($habits)): ?>
         <div class="empty-state">
-          <p>No habits yet — <a href="habits.php">create your first one →</a></p>
+          <p>No habits yet — <a href="../habits/habits.php">create your first one →</a></p>
         </div>
       <?php else: ?>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;">
@@ -117,7 +117,7 @@ $habits = $stmt->fetchAll();
                 </button>
               </form>
               <?php if ($h['habit_nature'] === 'bad'): ?>
-                <a href="bad-habit-progress.php?habit_id=<?php echo $h['habit_id']; ?>" style="display:block;text-align:center;margin-top:10px;font-size:13px;font-weight:600;">Log occurrence</a>
+                <a href="../bad-habit-progress/bad-habit-progress.php?habit_id=<?php echo $h['habit_id']; ?>" style="display:block;text-align:center;margin-top:10px;font-size:13px;font-weight:600;">Log occurrence</a>
               <?php endif; ?>
             </div>
           <?php endforeach; ?>

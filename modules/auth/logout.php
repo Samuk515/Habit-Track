@@ -1,21 +1,25 @@
 <?php
-session_start();
+declare(strict_types=1);
+require_once '../../includes/auth.php';
 
-// 1. Clear all session data
+// Wipe session data
 $_SESSION = [];
 
-// 2. Expire the session cookie
-if (ini_get("session.use_cookies")) { // Check if session cookies are being used ini_get reads a setting
-    $params = session_get_cookie_params(); // Get current session cookie parameters
-    setcookie(session_name(), '', time() - 42000,
-        $params["path"], $params["domain"],
-        $params["secure"], $params["httponly"]
+// Expire the session cookie itself, not just the server-side data
+if (ini_get('session.use_cookies')) {
+    $params = session_get_cookie_params();
+    setcookie(
+        session_name(),
+        '',
+        time() - 42000,
+        $params['path'],
+        $params['domain'],
+        $params['secure'],
+        $params['httponly']
     );
 }
 
-// 3. Destroy the session
 session_destroy();
 
-// 4. Redirect to login
-require_once __DIR__ . '/../../includes/functions.php'; // require once stope php with an error if the file is not found
-redirect('login.php');
+header('Location: login.php');
+exit;

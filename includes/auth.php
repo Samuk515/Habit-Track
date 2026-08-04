@@ -1,9 +1,18 @@
 <?php
-function requireLogin() {
-    if (session_status() !== PHP_SESSION_ACTIVE) {
-        session_start();
-    }
-    if (!isset($_SESSION['user_id'])) {
+declare(strict_types=1);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+function isLoggedIn(): bool
+{
+    return !empty($_SESSION['user_id']);
+}
+
+function requireLogin(): void
+{
+    if (!isLoggedIn()) {
         header('Location: ../auth/login.php');
         exit;
     }

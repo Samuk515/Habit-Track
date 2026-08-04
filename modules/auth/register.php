@@ -1,104 +1,120 @@
 <?php
-require __DIR__ . '/../../includes/csrf.php';
-require_once __DIR__ . '/../../includes/functions.php';
-session_start();
+declare(strict_types=1);
+require_once '../../includes/csrf.php';
+require_once '../../includes/db.php';
 
 $errors = [];
+$name = '';
+$email = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-  // 1. Verify CSRF token first — reject immediately if it fails
-  if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) { die('Invalid request.'); }
+    // 1. CSRF check happens before we touch anything else
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        $errors[] = 'Invalid or expired form submission. Please try again.';
+    } else {
+        $name = trim($_POST['name'] ?? '');
+        $email = strtolower(trim($_POST['email'] ?? ''));
+        $password = $_POST['password'] ?? '';
+        $confirmPassword = $_POST['confirm_password'] ?? '';
 
-  // 2. Grab and trim inputs from $_POST
-  $name = trim($_POST['name'] ?? ''); 
-  $email = strtolower(trim($_POST['email'] ?? ''));
-  $password = $_POST['password'] ?? '';
-  $confirm_password = $_POST['confirm_password'] ?? '';
+        // 2. Validate everything BEFORE any database write —
+        // the same lesson from the bad-habit-progress phantom-row bug
+        // applies here: no insert happens until every check passes.
+        if ($name === '' || $email === '' || $password === '') {
+            $errors[] = 'All fields are required.';
+        }
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Please enter a valid email address.';
+        }
+        if (strlen($password) < 8) {
+            $errors[] = 'Password must be at least 8 characters.';
+        }
+        if ($password !== $confirmPassword) {
+            $errors[] = 'Passwords do not match.';
+        }
 
-  // 3. Validate inputs and collect all errors
-  if ($name === '') {
-    $errors[] = 'Name is required.';
-  }
+        // 3. Uniqueness check — only runs if the basic checks passed
+        if (empty($errors)) {
+            $checkStmt = $pdo->prepare('SELECT user_id FROM USER WHERE email = ?');
+            $checkStmt->execute([$email]);
 
-  if ($email === '') {
-    $errors[] = 'Email is required.';
-  } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $errors[] = 'Email is not valid.';
-  }
+            if ($checkStmt->fetch()) {
+                $errors[] = 'An account with this email already exists.';
+            }
+        }
 
-  if (strlen($password) < 8) {
-    $errors[] = 'Password must be at least 8 characters.';
-  }
+        // 4. Write only after every validation branch above is clean
+        if (empty($errors)) {
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
-  if ($password !== $confirm_password) {
-    $errors[] = 'Passwords do not match.';
-  }
+            $insertStmt = $pdo->prepare(
+                'INSERT INTO USER (name, email, password, created_at) VALUES (?, ?, ?, NOW())'
+            );
 
-  // 4. If no validation errors so far, check for duplicate email
-  if (empty($errors)) {
-    require __DIR__ . '/../../includes/db.php';
-    $stmt = $pdo->prepare('SELECT user_id FROM USER WHERE email = ?');
-    $stmt->execute([$email]);
-    if ($stmt->fetch()) {
-      $errors[] = 'Email already registered.';
+            if ($insertStmt->execute([$name, $email, $hashedPassword])) {
+                // 5. Post/Redirect/Get — never leave a POST as the last request
+                header('Location: login.php?registered=1');
+                exit;
+            }
+
+            $errors[] = 'Registration failed. Please try again.';
+        }
     }
-  }
-
-  // 5. If still no errors, create the user and redirect to login
-    if (empty($errors)) {
-    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-    $stmt = $pdo->prepare('INSERT INTO USER (name, email, password) VALUES (?, ?, ?)');
-    $stmt->execute([$name, $email, $hashedPassword]);
-    redirect('login.php');
-  }
 }
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Register — Habit Track</title>
-  <link rel="stylesheet" href="auth.css?v=20260801-2">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register — Habit Track</title>
+<link rel="stylesheet" href="auth.css">
 </head>
 <body>
-  <div class="auth-wrap">
+<div class="auth-wrapper">
     <div class="auth-card">
-      <?php require __DIR__ . '/../../includes/logo.php'; ?>
-      <h1>Create your account</h1>
-      <p class="subtitle">Start tracking your habits today.</p>
+        <?php require_once '../../includes/logo.php'; ?>
+        <h1 class="auth-title">Create your account</h1>
 
-      <?php if (!empty($errors)): ?>
-        <div class="error-box">
-          <?php foreach ($errors as $err): ?>
-            <div><?php echo htmlspecialchars($err); ?></div>
-          <?php endforeach; ?>
+        <?php if (!empty($errors)): ?>
+        <div class="auth-errors">
+            <ul>
+                <?php foreach ($errors as $error): ?>
+                <li><?= htmlspecialchars($error) ?></li>
+                <?php endforeach; ?>
+            </ul>
         </div>
-      <?php endif; ?>
+        <?php endif; ?>
 
-      <div id="client-error-box" class="error-box" style="display:none;"></div>
+        <form method="POST" action="register.php" novalidate>
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCsrfToken()) ?>">
 
-      <form method="POST" action="register.php" id="register-form">
-        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-        <div class="field"><input type="text" name="name" id="name" placeholder="Full name" required></div>
-        <div class="field"><input type="email" name="email" id="email" placeholder="Email" required></div>
+            <label for="name">Full name</label>
+            <input type="text" id="name" name="name" value="<?= htmlspecialchars($name) ?>" required>
 
-        <div class="field password-wrap">
-          <input type="password" name="password" id="password" placeholder="Password" required>
-          <button type="button" class="toggle-password" data-target="password">Show</button>
-        </div>
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="<?= htmlspecialchars($email) ?>" required>
 
-        <div class="field password-wrap">
-          <input type="password" name="confirm_password" id="confirm_password" placeholder="Confirm password" required>
-          <button type="button" class="toggle-password" data-target="confirm_password">Show</button>
-        </div>
-        <div id="password-match-hint" class="field-hint"></div>
+            <label for="password">Password</label>
+            <div class="password-field">
+                <input type="password" id="password" name="password" required minlength="8">
+                <button type="button" class="toggle-password" data-target="password" aria-label="Show password">👁</button>
+            </div>
 
-        <button type="submit" class="btn-primary">Register</button>
-      </form>
+            <label for="confirm_password">Confirm password</label>
+            <div class="password-field">
+                <input type="password" id="confirm_password" name="confirm_password" required minlength="8">
+                <button type="button" class="toggle-password" data-target="confirm_password" aria-label="Show password">👁</button>
+            </div>
+            <p id="match-feedback" class="match-feedback"></p>
 
-      <div class="form-footer">Already have an account? <a href="login.php">Login</a></div>
+            <button type="submit" id="submit-btn" class="btn-submit">Create account</button>
+        </form>
+
+        <p class="auth-switch">Already have an account? <a href="login.php">Log in</a></p>
     </div>
-  </div>
-  <script src="auth.js"></script>
+</div>
+<script src="auth.js"></script>
 </body>
 </html>

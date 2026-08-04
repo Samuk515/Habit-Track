@@ -1,74 +1,97 @@
 <?php
-require __DIR__ . '/../../includes/csrf.php'; // redirects to login.php if not logged in
-require_once __DIR__ . '/../../includes/functions.php'; // for redirect()
-session_start();
+declare(strict_types=1);
+require_once '../../includes/csrf.php';
+require_once '../../includes/db.php';
 
 $errors = [];
+$email = '';
+
+if (!empty($_SESSION['user_id'])) {
+    header('Location: ../dashboard/dashboard.php');
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-  // 1. Verify CSRF token
-  if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) { die('Invalid request.'); } 
-
-  // 2. Grab and normalize inputs
-  $email = strtolower(trim($_POST['email'] ?? ''));
-  $password = $_POST['password'] ?? '';
-
-  // 3. Basic presence check
-  if ($email === '' || $password === '') {
-    $errors[] = 'Email and password are required.';
-  }
-
-  // 4 & 5. Lookup user and verify password
-  if (empty($errors)) {
-    require __DIR__ . '/../../includes/db.php';
-    $stmt = $pdo->prepare('SELECT user_id, name, password FROM USER WHERE email = ?');
-    $stmt->execute([$email]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$user || !password_verify($password, $user['password'])) {
-      $errors[] = 'Invalid email or password.';
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        $errors[] = 'Invalid or expired form submission. Please try again.';
     } else {
-      // 6. Success — establish session and redirect
-      session_regenerate_id(true);
-      $_SESSION['user_id'] = $user['user_id'];
-      $_SESSION['name'] = $user['name'];
-      redirect('dashboard.php');
+        $email = strtolower(trim($_POST['email'] ?? ''));
+        $password = $_POST['password'] ?? '';
+
+        if ($email === '' || $password === '') {
+            $errors[] = 'Please enter your email and password.';
+        }
+
+        if (empty($errors)) {
+            $stmt = $pdo->prepare('SELECT user_id, name, password FROM USER WHERE email = ?');
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
+
+            // Same generic message whether the email doesn't exist or
+            // the password is wrong — never reveal which one it was.
+            if (!$user || !password_verify($password, $user['password'])) {
+                $errors[] = 'Invalid email or password.';
+            } else {
+                // Regenerate the session ID on every successful login
+                // to prevent session fixation attacks.
+                session_regenerate_id(true);
+                $_SESSION['user_id'] = $user['user_id'];
+                $_SESSION['name'] = $user['name'];
+
+                header('Location: ../dashboard/dashboard.php');
+                exit;
+            }
+        }
     }
-  }
 }
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Login — Habit Track</title>
-  <link rel="stylesheet" href="auth.css?v=20260801-2">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log in — Habit Track</title>
+<link rel="stylesheet" href="auth.css">
 </head>
 <body>
-  <div class="auth-wrap">
+<div class="auth-wrapper">
     <div class="auth-card">
-      <?php require __DIR__ . '/../../includes/logo.php'; ?>
-      <h1>Welcome back</h1>
-      <p class="subtitle">Log in to continue your streaks.</p>
+        <?php require_once '../../includes/logo.php'; ?>
+        <h1 class="auth-title">Welcome back</h1>
 
-      <?php if (!empty($errors)): ?>
-        <div class="error-box">
-          <?php foreach ($errors as $err): ?>
-            <div><?php echo htmlspecialchars($err); ?></div>
-          <?php endforeach; ?>
+        <?php if (isset($_GET['registered'])): ?>
+        <div class="auth-success">Account created — please log in.</div>
+        <?php endif; ?>
+
+        <?php if (!empty($errors)): ?>
+        <div class="auth-errors">
+            <ul>
+                <?php foreach ($errors as $error): ?>
+                <li><?= htmlspecialchars($error) ?></li>
+                <?php endforeach; ?>
+            </ul>
         </div>
-      <?php endif; ?>
+        <?php endif; ?>
 
-      <form method="POST" action="login.php" id="login-form">
-        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-        <div class="field"><input type="email" name="email" placeholder="Email" required></div>
-        <div class="field"><input type="password" name="password" placeholder="Password" required></div>
-        <button type="submit" class="btn-primary">Login</button>
-      </form>
+        <form method="POST" action="login.php" novalidate>
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCsrfToken()) ?>">
 
-      <div class="form-footer">Don't have an account? <a href="register.php">Register</a></div>
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="<?= htmlspecialchars($email) ?>" required>
+
+            <label for="password">Password</label>
+            <div class="password-field">
+                <input type="password" id="password" name="password" required>
+                <button type="button" class="toggle-password" data-target="password" aria-label="Show password">👁</button>
+            </div>
+
+            <button type="submit" id="submit-btn" class="btn-submit">Log in</button>
+        </form>
+
+        <p class="auth-switch">Don't have an account? <a href="register.php">Register</a></p>
     </div>
-  </div>
-  <script src="auth.js"></script>
+</div>
+<script src="auth.js"></script>
 </body>
 </html>

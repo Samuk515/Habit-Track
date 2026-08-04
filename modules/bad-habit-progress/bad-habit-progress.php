@@ -122,15 +122,15 @@ $progressEntries = $progressStmt->fetchAll();
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
-      <a href="dashboard.php" class="nav-item">Dashboard</a>
-      <a href="habits.php" class="nav-item active">Habits</a>
-      <a href="categories.php" class="nav-item">Categories</a>
+      <a href="../dashboard/dashboard.php" class="nav-item">Dashboard</a>
+      <a href="../habits/habits.php" class="nav-item active">Habits</a>
+      <a href="../categories/categories.php" class="nav-item">Categories</a>
       <div style="margin-top:auto;">
-        <a href="logout.php" class="nav-item">Logout</a>
+        <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
     </div>
     <div class="main-content">
-      <a href="habits.php" style="font-size:13px;color:var(--muted);">← Back to Habits</a>
+      <a href="../habits/habits.php" style="font-size:13px;color:var(--muted);">← Back to Habits</a>
       <div class="page-header">
         <h1><?php echo htmlspecialchars($habit['habit_name']); ?> — Progress</h1>
       </div>
