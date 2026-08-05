@@ -1,0 +1,57 @@
+.sidebar-footer {
+    margin-top: auto;
+}
+
+.back-link {
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.progress-form-card {
+    max-width: 500px;
+    margin-bottom: 24px;
+}
+
+.btn-danger {
+    background: var(--coral);
+}
+
+.progress-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.progress-card {
+    max-width: 500px;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.progress-date {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 2px;
+}
+
+.progress-value {
+    font-weight: 600;
+}
+
+.progress-notes {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+}
+
+.btn-delete {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--coral);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+}

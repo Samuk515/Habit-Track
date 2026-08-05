@@ -1,54 +1,71 @@
 <?php
+declare(strict_types=1);
 require __DIR__ . '/../../includes/auth.php';
 requireLogin();
 require __DIR__ . '/../../includes/csrf.php';
+require __DIR__ . '/../../includes/functions.php';
 require __DIR__ . '/../../includes/db.php';
 
 $errors = [];
-$userId = $_SESSION['user_id'];
+$userId = (int) $_SESSION['user_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // 1. Verify CSRF token 
-    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) { die('Invalid request.'); }
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid request.');
+    }
 
     $action = $_POST['action'] ?? '';
 
     if ($action === 'add') {
-        // 2. Grab and trim category_name and description from $_POST
         $name = trim($_POST['category_name'] ?? '');
         $description = trim($_POST['description'] ?? '');
 
-        // 3. Validate: category_name is not empty
         if ($name === '') {
             $errors[] = 'Category name is required.';
         }
 
-        // 4. If valid, insert:
-        //    INSERT INTO CATEGORY (user_id, category_name, description) 
         if (empty($errors)) {
-            $stmt = $pdo->prepare('INSERT INTO CATEGORY (user_id, category_name, description) VALUES (?, ?, ?)');
-            $stmt->execute([$userId, $name, $description]);
+            $stmt = mysqli_prepare($conn, 'INSERT INTO CATEGORY (user_id, category_name, description) VALUES (?, ?, ?)');
+            mysqli_stmt_bind_param($stmt, 'iss', $userId, $name, $description);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_close($stmt);
+
+            // Post/Redirect/Get — the original fell through to re-render
+            // instead of redirecting, which means a page refresh after
+            // adding a category would silently resubmit the same insert.
+            redirect('categories.php');
         }
     }
 
     if ($action === 'delete') {
-        // 5. Grab category_id from $_POST
         $categoryId = $_POST['category_id'] ?? '';
 
-        // 6. Delete with BOTH conditions in the WHERE clause:
-        //    DELETE FROM CATEGORY WHERE category_id = ? AND user_id = ?
-        if (filter_var($categoryId, FILTER_VALIDATE_INT)) {
-            $stmt = $pdo->prepare('DELETE FROM CATEGORY WHERE category_id = ? AND user_id = ?');
-            $stmt->execute([$categoryId, $userId]);
+        // !== false, not a truthy check — FILTER_VALIDATE_INT returns
+        // 0 for a valid "0", and 0 is falsy in PHP. A plain `if (filter_var(...))`
+        // would silently reject a real category_id of 0.
+        if (filter_var($categoryId, FILTER_VALIDATE_INT) !== false) {
+            $categoryId = (int) $categoryId;
+
+            // Ownership enforced directly in the WHERE clause — CATEGORY
+            // has user_id as a native column, no JOIN needed here (unlike
+            // HABIT and everything below it).
+            $stmt = mysqli_prepare($conn, 'DELETE FROM CATEGORY WHERE category_id = ? AND user_id = ?');
+            mysqli_stmt_bind_param($stmt, 'ii', $categoryId, $userId);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_close($stmt);
+
+            redirect('categories.php');
         }
     }
 }
 
-// 7. Fetch this user's categories to display:
-$stmt = $pdo->prepare('SELECT * FROM CATEGORY WHERE user_id = ? ORDER BY created_at DESC');
-$stmt->execute([$userId]);
-$categories = $stmt->fetchAll();
+$stmt = mysqli_prepare($conn, 'SELECT * FROM CATEGORY WHERE user_id = ? ORDER BY created_at DESC');
+mysqli_stmt_bind_param($stmt, 'i', $userId);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+$categories = mysqli_fetch_all($result, MYSQLI_ASSOC);
+mysqli_stmt_close($stmt);
 ?>
 <!DOCTYPE html>
 <html>
@@ -63,7 +80,7 @@ $categories = $stmt->fetchAll();
       <a href="../dashboard/dashboard.php" class="nav-item">Dashboard</a>
       <a href="../habits/habits.php" class="nav-item">Habits</a>
       <a href="categories.php" class="nav-item active">Categories</a>
-      <div style="margin-top:auto;">
+      <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
     </div>
@@ -74,7 +91,7 @@ $categories = $stmt->fetchAll();
         <div class="error-box"><?php echo htmlspecialchars($err); ?></div>
       <?php endforeach; ?>
 
-      <div class="auth-card" style="max-width:500px;margin-bottom:24px;">
+      <div class="auth-card category-form-card">
         <form method="POST" action="categories.php">
           <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
           <input type="hidden" name="action" value="add">
@@ -87,20 +104,20 @@ $categories = $stmt->fetchAll();
       <?php if (empty($categories)): ?>
         <div class="empty-state"><p>No categories yet.</p></div>
       <?php else: ?>
-        <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="category-list">
         <?php foreach ($categories as $cat): ?>
-          <div class="auth-card" style="max-width:500px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+          <div class="auth-card category-card">
             <div>
-              <div style="font-weight:600;"><?php echo htmlspecialchars($cat['category_name']); ?></div>
+              <div class="category-name"><?php echo htmlspecialchars($cat['category_name']); ?></div>
               <?php if (!empty($cat['description'])): ?>
-                <div style="font-size:12px;color:var(--muted);margin-top:2px;"><?php echo htmlspecialchars($cat['description']); ?></div>
+                <div class="category-desc"><?php echo htmlspecialchars($cat['description']); ?></div>
               <?php endif; ?>
             </div>
             <form method="POST" action="categories.php">
               <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
               <input type="hidden" name="action" value="delete">
               <input type="hidden" name="category_id" value="<?php echo $cat['category_id']; ?>">
-              <button type="submit" style="background:none;border:1px solid var(--border);color:var(--coral);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;">Delete</button>
+              <button type="submit" class="btn-delete">Delete</button>
             </form>
           </div>
         <?php endforeach; ?>

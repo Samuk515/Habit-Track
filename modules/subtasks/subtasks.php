@@ -1,69 +1,101 @@
 <?php
+declare(strict_types=1);
 require __DIR__ . '/../../includes/auth.php';
 requireLogin();
 require __DIR__ . '/../../includes/csrf.php';
+require __DIR__ . '/../../includes/functions.php';
 require __DIR__ . '/../../includes/db.php';
 
-$userId = $_SESSION['user_id'];
+$userId = (int) $_SESSION['user_id'];
 $errors = [];
 
 $habitId = $_GET['habit_id'] ?? ($_POST['habit_id'] ?? '');
 if (filter_var($habitId, FILTER_VALIDATE_INT) === false) {
     die('Invalid habit.');
 }
+$habitId = (int) $habitId;
 
-$ownerStmt = $pdo->prepare('SELECT HABIT.habit_id, HABIT.habit_name FROM HABIT
+// Ownership verified ONCE, here, at the top of the file — every
+// query below trusts this $habitId without re-checking, because it's
+// already scoped to a habit that belongs to CATEGORY.user_id = $userId.
+$ownerStmt = mysqli_prepare($conn, 'SELECT HABIT.habit_id, HABIT.habit_name FROM HABIT
     INNER JOIN CATEGORY ON HABIT.category_id = CATEGORY.category_id
     WHERE HABIT.habit_id = ? AND CATEGORY.user_id = ?');
-$ownerStmt->execute([$habitId, $userId]);
-$habit = $ownerStmt->fetch();
+mysqli_stmt_bind_param($ownerStmt, 'ii', $habitId, $userId);
+mysqli_stmt_execute($ownerStmt);
+$ownerResult = mysqli_stmt_get_result($ownerStmt);
+$habit = mysqli_fetch_assoc($ownerResult);
+mysqli_stmt_close($ownerStmt);
+
 if (!$habit) {
     die('Habit not found.');
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-    die('Invalid request.');
-  }
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid request.');
+    }
 
     $action = $_POST['action'] ?? '';
 
     if ($action === 'add') {
-    $subtaskName = trim($_POST['subtask_name'] ?? '');
-    $description = trim($_POST['description'] ?? '');
-    $isOptional = isset($_POST['is_optional']) ? 1 : 0;
+        $subtaskName = trim($_POST['subtask_name'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $isOptional = isset($_POST['is_optional']) ? 1 : 0;
 
-    if ($subtaskName === '') {
-      $errors[] = 'Subtask name is required.';
-    }
+        if ($subtaskName === '') {
+            $errors[] = 'Subtask name is required.';
+        }
 
-    if ($description === '') {
-      $description = null;
-    }
+        if ($description === '') {
+            $description = null;
+        }
 
-    if (empty($errors)) {
-      $orderStmt = $pdo->prepare('SELECT COALESCE(MAX(order_no), 0) + 1 AS next_order FROM SUBTASK WHERE habit_id = ?');
-      $orderStmt->execute([$habitId]);
-      $nextOrder = (int) $orderStmt->fetchColumn();
+        if (empty($errors)) {
+            // mysqli has no fetchColumn() — pull the single column out
+            // of the fetched row manually.
+            $orderStmt = mysqli_prepare($conn, 'SELECT COALESCE(MAX(order_no), 0) + 1 AS next_order FROM SUBTASK WHERE habit_id = ?');
+            mysqli_stmt_bind_param($orderStmt, 'i', $habitId);
+            mysqli_stmt_execute($orderStmt);
+            $orderResult = mysqli_stmt_get_result($orderStmt);
+            $orderRow = mysqli_fetch_assoc($orderResult);
+            $nextOrder = (int) $orderRow['next_order'];
+            mysqli_stmt_close($orderStmt);
 
-      $insertStmt = $pdo->prepare('INSERT INTO SUBTASK (habit_id, subtask_name, description, is_optional, order_no) VALUES (?, ?, ?, ?, ?)');
-      $insertStmt->execute([$habitId, $subtaskName, $description, $isOptional, $nextOrder]);
-    }
+            $insertStmt = mysqli_prepare($conn, 'INSERT INTO SUBTASK (habit_id, subtask_name, description, is_optional, order_no) VALUES (?, ?, ?, ?, ?)');
+            mysqli_stmt_bind_param($insertStmt, 'issii', $habitId, $subtaskName, $description, $isOptional, $nextOrder);
+            mysqli_stmt_execute($insertStmt);
+            mysqli_stmt_close($insertStmt);
+
+            redirect('subtasks.php?habit_id=' . $habitId);
+        }
     }
 
     if ($action === 'delete') {
-    $subtaskId = $_POST['subtask_id'] ?? '';
+        $subtaskId = $_POST['subtask_id'] ?? '';
 
-    if (filter_var($subtaskId, FILTER_VALIDATE_INT) !== false) {
-      $deleteStmt = $pdo->prepare('DELETE FROM SUBTASK WHERE subtask_id = ? AND habit_id = ?');
-      $deleteStmt->execute([$subtaskId, $habitId]);
-    }
+        if (filter_var($subtaskId, FILTER_VALIDATE_INT) !== false) {
+            $subtaskId = (int) $subtaskId;
+
+            // habit_id is already the verified-owned one from the top
+            // of the file — this WHERE clause can't touch another
+            // user's subtask even if subtask_id were guessed/tampered.
+            $deleteStmt = mysqli_prepare($conn, 'DELETE FROM SUBTASK WHERE subtask_id = ? AND habit_id = ?');
+            mysqli_stmt_bind_param($deleteStmt, 'ii', $subtaskId, $habitId);
+            mysqli_stmt_execute($deleteStmt);
+            mysqli_stmt_close($deleteStmt);
+
+            redirect('subtasks.php?habit_id=' . $habitId);
+        }
     }
 }
 
-$subtaskStmt = $pdo->prepare('SELECT * FROM SUBTASK WHERE habit_id = ? ORDER BY order_no ASC');
-$subtaskStmt->execute([$habitId]);
-$subtasks = $subtaskStmt->fetchAll();
+$subtaskStmt = mysqli_prepare($conn, 'SELECT * FROM SUBTASK WHERE habit_id = ? ORDER BY order_no ASC');
+mysqli_stmt_bind_param($subtaskStmt, 'i', $habitId);
+mysqli_stmt_execute($subtaskStmt);
+$subtaskResult = mysqli_stmt_get_result($subtaskStmt);
+$subtasks = mysqli_fetch_all($subtaskResult, MYSQLI_ASSOC);
+mysqli_stmt_close($subtaskStmt);
 ?>
 <!DOCTYPE html>
 <html>
@@ -78,12 +110,12 @@ $subtasks = $subtaskStmt->fetchAll();
       <a href="../dashboard/dashboard.php" class="nav-item">Dashboard</a>
       <a href="../habits/habits.php" class="nav-item active">Habits</a>
       <a href="../categories/categories.php" class="nav-item">Categories</a>
-      <div style="margin-top:auto;">
+      <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
     </div>
     <div class="main-content">
-      <a href="../habits/habits.php" style="font-size:13px;color:var(--muted);">← Back to Habits</a>
+      <a href="../habits/habits.php" class="back-link">← Back to Habits</a>
       <div class="page-header">
         <h1><?php echo htmlspecialchars($habit['habit_name']); ?> — Subtasks</h1>
       </div>
@@ -92,7 +124,7 @@ $subtasks = $subtaskStmt->fetchAll();
         <div class="error-box"><?php echo htmlspecialchars($err); ?></div>
       <?php endforeach; ?>
 
-      <div class="auth-card" style="max-width:500px;margin-bottom:24px;">
+      <div class="auth-card subtask-form-card">
         <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>">
           <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
           <input type="hidden" name="action" value="add">
@@ -100,9 +132,9 @@ $subtasks = $subtaskStmt->fetchAll();
 
           <div class="field"><input type="text" name="subtask_name" placeholder="Subtask name" required></div>
           <div class="field"><input type="text" name="description" placeholder="Description (optional)"></div>
-          <div class="field" style="display:flex;align-items:center;gap:8px;">
-            <input type="checkbox" name="is_optional" id="is_optional" style="width:auto;">
-            <label for="is_optional" style="font-size:14px;color:var(--muted);">This subtask is optional</label>
+          <div class="field field-checkbox">
+            <input type="checkbox" name="is_optional" id="is_optional" class="checkbox-input">
+            <label for="is_optional" class="checkbox-label">This subtask is optional</label>
           </div>
 
           <button type="submit" class="btn-primary">Add Subtask</button>
@@ -112,18 +144,18 @@ $subtasks = $subtaskStmt->fetchAll();
       <?php if (empty($subtasks)): ?>
         <div class="empty-state"><p>No subtasks yet.</p></div>
       <?php else: ?>
-        <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="subtask-list">
           <?php foreach ($subtasks as $s): ?>
-            <div class="auth-card" style="max-width:500px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+            <div class="auth-card subtask-card">
               <div>
-                <div style="font-weight:600;">
+                <div class="subtask-name">
                   <?php echo htmlspecialchars($s['subtask_name']); ?>
                   <?php if ($s['is_optional']): ?>
-                    <span style="font-size:11px;color:var(--muted);font-weight:400;">(optional)</span>
+                    <span class="subtask-optional-badge">(optional)</span>
                   <?php endif; ?>
                 </div>
                 <?php if ($s['description']): ?>
-                  <div style="font-size:12px;color:var(--muted);margin-top:2px;"><?php echo htmlspecialchars($s['description']); ?></div>
+                  <div class="subtask-desc"><?php echo htmlspecialchars($s['description']); ?></div>
                 <?php endif; ?>
               </div>
               <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>">
@@ -131,7 +163,7 @@ $subtasks = $subtaskStmt->fetchAll();
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
                 <input type="hidden" name="subtask_id" value="<?php echo $s['subtask_id']; ?>">
-                <button type="submit" style="background:none;border:1px solid var(--border);color:var(--coral);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;">Delete</button>
+                <button type="submit" class="btn-delete">Delete</button>
               </form>
             </div>
           <?php endforeach; ?>

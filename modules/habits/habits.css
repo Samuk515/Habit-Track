@@ -1,0 +1,81 @@
+.sidebar-footer {
+    margin-top: auto;
+}
+
+.habits-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.flex-fill {
+    flex: 1;
+}
+
+.habit-form-card {
+    flex: 0 0 420px;
+}
+
+.select-input {
+    width: 100%;
+    padding: 11px 13px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    font-size: 14px;
+}
+
+.habit-list {
+    flex: 1;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.habit-row {
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.habit-title {
+    font-weight: 600;
+}
+
+.habit-row-category {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+}
+
+.habit-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.link-purple {
+    color: var(--purple);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.link-coral {
+    color: var(--coral);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.btn-delete {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--coral);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+}

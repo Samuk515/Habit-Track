@@ -7,7 +7,7 @@ $errors = [];
 $email = '';
 
 if (!empty($_SESSION['user_id'])) {
-    header('Location: ../dashboard/dashboard.php');
+    header('Location: /modules/dashboard/dashboard.php');
     exit;
 }
 
@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
         $errors[] = 'Invalid or expired form submission. Please try again.';
     } else {
-        $email = strtolower(trim($_POST['email'] ?? ''));
+        $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
 
         if ($email === '' || $password === '') {
@@ -24,9 +24,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (empty($errors)) {
-            $stmt = $pdo->prepare('SELECT user_id, name, password FROM USER WHERE email = ?');
-            $stmt->execute([$email]);
-            $user = $stmt->fetch();
+            $stmt = mysqli_prepare($conn, 'SELECT user_id, name, password FROM USER WHERE email = ?');
+            mysqli_stmt_bind_param($stmt, 's', $email);
+            mysqli_stmt_execute($stmt);
+            $result = mysqli_stmt_get_result($stmt);
+            $user = mysqli_fetch_assoc($result);
+            mysqli_stmt_close($stmt);
 
             // Same generic message whether the email doesn't exist or
             // the password is wrong — never reveal which one it was.
@@ -39,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['user_id'] = $user['user_id'];
                 $_SESSION['name'] = $user['name'];
 
-                header('Location: ../dashboard/dashboard.php');
+                header('Location: /modules/dashboard/dashboard.php');
                 exit;
             }
         }
