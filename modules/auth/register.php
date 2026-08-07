@@ -18,9 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password = $_POST['password'] ?? '';
         $confirmPassword = $_POST['confirm_password'] ?? '';
 
-        // 2. Validate everything BEFORE any database write —
-        // the same lesson from the bad-habit-progress phantom-row bug
-        // applies here: no insert happens until every check passes.
+        // 2. Validate everything BEFORE any database write
         if ($name === '' || $email === '' || $password === '') {
             $errors[] = 'All fields are required.';
         }
@@ -34,30 +32,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Passwords do not match.';
         }
 
-        // 3. Uniqueness check — only runs if the basic checks passed
+        // 3. Uniqueness check using MySQLi
         if (empty($errors)) {
-            $checkStmt = $pdo->prepare('SELECT user_id FROM USER WHERE email = ?');
-            $checkStmt->execute([$email]);
-
-            if ($checkStmt->fetch()) {
+            $checkStmt = mysqli_prepare($conn, 'SELECT user_id FROM USER WHERE email = ?');
+            mysqli_stmt_bind_param($checkStmt, 's', $email);
+            mysqli_stmt_execute($checkStmt);
+            $result = mysqli_stmt_get_result($checkStmt);
+            
+            if (mysqli_fetch_assoc($result)) {
                 $errors[] = 'An account with this email already exists.';
             }
+            mysqli_stmt_close($checkStmt);
         }
 
-        // 4. Write only after every validation branch above is clean
+        // 4. Write only after every validation branch is clean
         if (empty($errors)) {
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
-            $insertStmt = $pdo->prepare(
+            $insertStmt = mysqli_prepare(
+                $conn,
                 'INSERT INTO USER (name, email, password, created_at) VALUES (?, ?, ?, NOW())'
             );
+            mysqli_stmt_bind_param($insertStmt, 'sss', $name, $email, $hashedPassword);
 
-            if ($insertStmt->execute([$name, $email, $hashedPassword])) {
-                // 5. Post/Redirect/Get — never leave a POST as the last request
+            if (mysqli_stmt_execute($insertStmt)) {
+                // 5. Post/Redirect/Get
                 header('Location: login.php?registered=1');
                 exit;
             }
-
+            mysqli_stmt_close($insertStmt);
+            
             $errors[] = 'Registration failed. Please try again.';
         }
     }
@@ -70,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Register — Habit Track</title>
 <link rel="stylesheet" href="auth.css">
+    <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
 <div class="auth-wrapper">

@@ -54,20 +54,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $todayLog = mysqli_fetch_assoc($logResult);
             mysqli_stmt_close($logStmt);
 
-            if ($todayLog) {
-                $logId = (int) $todayLog['log_id'];
-                $deleteStmt = mysqli_prepare($conn, 'DELETE FROM HABIT_LOG WHERE log_id = ?');
-                mysqli_stmt_bind_param($deleteStmt, 'i', $logId);
-                mysqli_stmt_execute($deleteStmt);
-                mysqli_stmt_close($deleteStmt);
-            } else {
+          if (!$todayLog) {
                 $insertStmt = mysqli_prepare($conn, "INSERT INTO HABIT_LOG (habit_id, log_date, status) VALUES (?, CURDATE(), 'done')");
                 mysqli_stmt_bind_param($insertStmt, 'i', $habitId);
                 mysqli_stmt_execute($insertStmt);
                 mysqli_stmt_close($insertStmt);
-            }
 
             calculateAndSaveStreak($conn, $habitId);
+            }
 
             redirect('dashboard.php');
         }
@@ -96,6 +90,7 @@ mysqli_stmt_close($stmt);
 <head>
   <title>Dashboard — Habit Track</title>
   <link rel="stylesheet" href="dashboard.css?v=20260801-2">
+  <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
   <div class="app-layout">
@@ -104,6 +99,7 @@ mysqli_stmt_close($stmt);
       <a href="dashboard.php" class="nav-item active">Dashboard</a>
       <a href="../habits/habits.php" class="nav-item">Habits</a>
       <a href="../categories/categories.php" class="nav-item">Categories</a>
+      <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
@@ -131,14 +127,16 @@ mysqli_stmt_close($stmt);
                 <div class="habit-streak">🔥 <?php echo (int) $h['current_streak']; ?></div>
               <?php endif; ?>
               <div class="habit-name"><?php echo htmlspecialchars($h['habit_name']); ?></div>
-              <form method="POST" action="dashboard.php">
-                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                <input type="hidden" name="action" value="toggle_done">
-                <input type="hidden" name="habit_id" value="<?php echo $h['habit_id']; ?>">
-                <button type="submit" class="btn-primary<?php echo $isDone ? ' btn-done' : ''; ?>">
-                  <?php echo $isDone ? '✓ Done' : 'Mark done'; ?>
-                </button>
-              </form>
+              <?php if ($isDone): ?>
+                <button type="button" class="btn-primary btn-done" disabled>Done</button>
+              <?php else: ?>
+                <form method="POST" action="dashboard.php">
+                  <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                  <input type="hidden" name="action" value="toggle_done">
+                  <input type="hidden" name="habit_id" value="<?php echo $h['habit_id']; ?>">
+                  <button type="submit" class="btn-primary">Mark done</button>
+                </form>
+              <?php endif; ?>
               <?php if ($h['habit_nature'] === 'bad'): ?>
                 <a href="../bad-habit-progress/bad-habit-progress.php?habit_id=<?php echo $h['habit_id']; ?>" class="habit-bad-link">Log occurrence</a>
               <?php endif; ?>

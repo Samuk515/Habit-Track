@@ -2,12 +2,17 @@
 declare(strict_types=1);
 require __DIR__ . '/../../includes/auth.php';
 requireLogin();
-require __DIR__ . '/../../includes/csrf.php';
 require __DIR__ . '/../../includes/functions.php';
 require __DIR__ . '/../../includes/db.php';
 
 $errors = [];
 $userId = (int) $_SESSION['user_id'];
+$perPage = 10;
+$page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+$offset = ($page - 1) * $perPage;
+
+$editHabitId = filter_var($_GET['edit_habit_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
+$editValues = null;
 
 $catStmt = mysqli_prepare($conn, 'SELECT category_id, category_name FROM CATEGORY WHERE user_id = ? ORDER BY category_name');
 mysqli_stmt_bind_param($catStmt, 'i', $userId);
@@ -18,13 +23,9 @@ mysqli_stmt_close($catStmt);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-        die('Invalid request.');
-    }
-
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'add') {
+    if ($action === 'add' || $action === 'update') {
 
         $habitName = trim($_POST['habit_name'] ?? '');
         $categoryId = $_POST['category_id'] ?? '';
@@ -38,9 +39,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Habit name is required.';
         }
 
-        // Ownership check against the $categories list already fetched
-        // above (belongs to this user) — not a fresh query, since we
-        // already have exactly the set of categories this user owns.
         $ownsCategory = false;
         foreach ($categories as $cat) {
             if ((string) $cat['category_id'] === (string) $categoryId) {
@@ -48,7 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
             }
         }
-
         if (!$ownsCategory) {
             $errors[] = 'Please select a valid category.';
         }
@@ -61,14 +58,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Please select a valid measurement type.';
         }
 
-        if (!in_array($targetType, ['daily', 'weekly'], true)) {
+        // Three options now, not two — matches the widened target_type
+        // column (see the ALTER statement note alongside this file).
+        if (!in_array($targetType, ['daily', 'twice a week', 'weekly'], true)) {
             $errors[] = 'Please select a valid target type.';
         }
 
-        // Cast only happens on the validated-int branch, so an empty
-        // target value stays PHP null (-> SQL NULL) rather than
-        // becoming (int) null == 0, which would be a different,
-        // wrong value in the database.
         if ($targetValue === '') {
             $targetValue = null;
         } elseif (filter_var($targetValue, FILTER_VALIDATE_INT) === false) {
@@ -77,15 +72,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $targetValue = (int) $targetValue;
         }
 
-        if (empty($errors)) {
-            $categoryId = (int) $categoryId;
+        if ($action === 'add') {
+            if (empty($errors)) {
+                $categoryId = (int) $categoryId;
 
-            $stmt = mysqli_prepare($conn, 'INSERT INTO HABIT (category_id, habit_name, habit_nature, measurement_type, target_value, target_type, description) VALUES (?, ?, ?, ?, ?, ?, ?)');
-            mysqli_stmt_bind_param($stmt, 'isssiss', $categoryId, $habitName, $habitNature, $measurementType, $targetValue, $targetType, $description);
-            mysqli_stmt_execute($stmt);
-            mysqli_stmt_close($stmt);
+                $stmt = mysqli_prepare($conn, 'INSERT INTO HABIT (category_id, habit_name, habit_nature, measurement_type, target_value, target_type, description) VALUES (?, ?, ?, ?, ?, ?, ?)');
+                mysqli_stmt_bind_param($stmt, 'isssiss', $categoryId, $habitName, $habitNature, $measurementType, $targetValue, $targetType, $description);
+                mysqli_stmt_execute($stmt);
+                mysqli_stmt_close($stmt);
 
-            redirect('habits.php');
+                header('Location: habits.php?page=' . $page);
+                exit;
+            }
+        }
+
+        if ($action === 'update') {
+            $habitId = $_POST['habit_id'] ?? '';
+            if (filter_var($habitId, FILTER_VALIDATE_INT) === false) {
+                $errors[] = 'Invalid habit.';
+            } else {
+                $habitId = (int) $habitId;
+            }
+
+            if (empty($errors)) {
+                $categoryId = (int) $categoryId;
+
+                $stmt = mysqli_prepare($conn, 'UPDATE HABIT
+                    SET habit_name = ?, category_id = ?, habit_nature = ?, measurement_type = ?, target_value = ?, target_type = ?, description = ?
+                    WHERE habit_id = ? AND category_id IN (SELECT category_id FROM CATEGORY WHERE user_id = ?)');
+                mysqli_stmt_bind_param($stmt, 'sissisiii', $habitName, $categoryId, $habitNature, $measurementType, $targetValue, $targetType, $description, $habitId, $userId);
+                mysqli_stmt_execute($stmt);
+                $affected = mysqli_stmt_affected_rows($stmt);
+                mysqli_stmt_close($stmt);
+
+                if ($affected === 0) {
+                    $errors[] = 'Habit not found.';
+                } else {
+                    header('Location: habits.php?page=' . $page);
+                    exit;
+                }
+            }
+
+            if (!empty($errors)) {
+                $editHabitId = $habitId ?? null;
+                $editValues = [
+                    'habit_id' => $editHabitId,
+                    'habit_name' => $habitName,
+                    'category_id' => $categoryId,
+                    'habit_nature' => $habitNature,
+                    'measurement_type' => $measurementType,
+                    'target_value' => $targetValue,
+                    'target_type' => $targetType,
+                    'description' => $description,
+                ];
+            }
         }
     }
 
@@ -95,24 +135,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (filter_var($habitId, FILTER_VALIDATE_INT) !== false) {
             $habitId = (int) $habitId;
 
-            // Ownership via subquery instead of JOIN — different shape,
-            // same guarantee: only deletes if the habit's category
-            // belongs to this user.
             $stmt = mysqli_prepare($conn, 'DELETE FROM HABIT WHERE habit_id = ? AND
             category_id IN (SELECT category_id FROM CATEGORY WHERE user_id = ?)');
             mysqli_stmt_bind_param($stmt, 'ii', $habitId, $userId);
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            redirect('habits.php');
+            header('Location: habits.php?page=' . $page);
+            exit;
         }
     }
 }
 
+$countStmt = mysqli_prepare($conn, 'SELECT COUNT(*) FROM HABIT WHERE category_id IN (SELECT category_id FROM CATEGORY WHERE user_id = ?)');
+mysqli_stmt_bind_param($countStmt, 'i', $userId);
+mysqli_stmt_execute($countStmt);
+mysqli_stmt_bind_result($countStmt, $totalHabits);
+mysqli_stmt_fetch($countStmt);
+mysqli_stmt_close($countStmt);
+$totalPages = (int) ceil($totalHabits / $perPage);
+
+if ($totalPages > 0 && $page > $totalPages) {
+    $page = $totalPages;
+    $offset = ($page - 1) * $perPage;
+}
+
 $habitStmt = mysqli_prepare($conn, 'SELECT HABIT.*, CATEGORY.category_name
-  FROM HABIT INNER JOIN CATEGORY ON HABIT.category_id = CATEGORY.category_id WHERE CATEGORY.user_id = ?
-   ORDER BY HABIT.created_at DESC');
-mysqli_stmt_bind_param($habitStmt, 'i', $userId);
+  FROM HABIT INNER JOIN CATEGORY ON HABIT.category_id = CATEGORY.category_id
+  WHERE CATEGORY.user_id = ?
+  ORDER BY HABIT.created_at DESC
+  LIMIT ? OFFSET ?');
+mysqli_stmt_bind_param($habitStmt, 'iii', $userId, $perPage, $offset);
 mysqli_stmt_execute($habitStmt);
 $habitResult = mysqli_stmt_get_result($habitStmt);
 $habits = mysqli_fetch_all($habitResult, MYSQLI_ASSOC);
@@ -122,7 +175,8 @@ mysqli_stmt_close($habitStmt);
 <html>
 <head>
   <title>Habits — Habit Track</title>
-  <link rel="stylesheet" href="habits.css?v=20260801-2">
+  <link rel="stylesheet" href="habits.css?v=20260801-4">
+  <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
   <div class="app-layout">
@@ -131,6 +185,7 @@ mysqli_stmt_close($habitStmt);
       <a href="../dashboard/dashboard.php" class="nav-item">Dashboard</a>
       <a href="habits.php" class="nav-item active">Habits</a>
       <a href="../categories/categories.php" class="nav-item">Categories</a>
+      <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
@@ -142,90 +197,170 @@ mysqli_stmt_close($habitStmt);
         <div class="error-box"><?php echo htmlspecialchars($err); ?></div>
       <?php endforeach; ?>
 
-      <div class="habits-layout">
+      <?php if (empty($categories)): ?>
+        <div class="empty-state">
+          <p>You need at least one category before adding a habit.</p>
+          <a href="../categories/categories.php">Create a category →</a>
+        </div>
+      <?php else: ?>
+        <div class="auth-card habit-form-card">
+          <form method="POST" action="habits.php?page=<?php echo $page; ?>">
+            <input type="hidden" name="action" value="add">
 
-        <?php if (empty($categories)): ?>
-          <div class="empty-state flex-fill">
-            <p>You need at least one category before adding a habit.</p>
-            <a href="../categories/categories.php">Create a category →</a>
-          </div>
-        <?php else: ?>
-          <div class="auth-card habit-form-card">
-            <form method="POST" action="habits.php">
-              <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-              <input type="hidden" name="action" value="add">
+            <div class="field"><input type="text" name="habit_name" placeholder="Habit name" required></div>
 
-              <div class="field"><input type="text" name="habit_name" placeholder="Habit name" required></div>
+            <div class="field">
+              <select name="category_id" required class="select-input">
+                <option value="">Select category</option>
+                <?php foreach ($categories as $cat): ?>
+                  <option value="<?php echo $cat['category_id']; ?>"><?php echo htmlspecialchars($cat['category_name']); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
 
-              <div class="field">
-                <select name="category_id" required class="select-input">
-                  <option value="">Select category</option>
-                  <?php foreach ($categories as $cat): ?>
-                    <option value="<?php echo $cat['category_id']; ?>"><?php echo htmlspecialchars($cat['category_name']); ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
+            <div class="field">
+              <select name="habit_nature" class="select-input">
+                <option value="good">Good habit</option>
+                <option value="bad">Bad habit</option>
+              </select>
+            </div>
 
-              <div class="field">
-                <select name="habit_nature" class="select-input">
-                  <option value="good">Good habit</option>
-                  <option value="bad">Bad habit</option>
-                </select>
-              </div>
+            <div class="field">
+              <select name="measurement_type" class="select-input measurement-select">
+                <option value="boolean">Simple (yes/no)</option>
+                <option value="count">Count (e.g. glasses of water)</option>
+                <option value="duration">Duration (minutes)</option>
+              </select>
+            </div>
 
-              <div class="field">
-                <select name="measurement_type" class="select-input">
-                  <option value="boolean">Simple (did / didn't)</option>
-                  <option value="count">Count (e.g. glasses of water)</option>
-                  <option value="duration">Duration (minutes)</option>
-                </select>
-              </div>
+            <div class="field target-value-field"><input type="number" name="target_value" placeholder="Target value (if count/duration)"></div>
 
-              <div class="field"><input type="number" name="target_value" placeholder="Target value (if count/duration)"></div>
+            <div class="field">
+              <select name="target_type" class="select-input">
+                <option value="daily">Daily</option>
+                <option value="twice a week">Twice a week</option>
+                <option value="weekly">Weekly</option>
+              </select>
+            </div>
 
-              <div class="field">
-                <select name="target_type" class="select-input">
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                </select>
-              </div>
+            <div class="field"><input type="text" name="description" placeholder="Description (optional)"></div>
 
-              <div class="field"><input type="text" name="description" placeholder="Description (optional)"></div>
+            <button type="submit" class="btn-primary">Add Habit</button>
+          </form>
+        </div>
+      <?php endif; ?>
 
-              <button type="submit" class="btn-primary">Add Habit</button>
-            </form>
-          </div>
-        <?php endif; ?>
-
-        <?php if (empty($habits)): ?>
-          <div class="empty-state flex-fill"><p>No habits yet.</p></div>
-        <?php else: ?>
-          <div class="habit-list">
+      <?php if (empty($habits)): ?>
+        <div class="empty-state"><p>No habits yet.</p></div>
+      <?php else: ?>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Habit</th>
+              <th>Category</th>
+              <th>Type</th>
+              <th>Frequency</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
             <?php foreach ($habits as $h): ?>
-              <div class="auth-card habit-row">
-                <div>
-                  <div class="habit-title"><?php echo htmlspecialchars($h['habit_name']); ?></div>
-                  <div class="habit-row-category"><?php echo htmlspecialchars($h['category_name']); ?></div>
-                </div>
-                <div class="habit-row-actions">
-                  <a href="../subtasks/subtasks.php?habit_id=<?php echo $h['habit_id']; ?>" class="link-purple">Manage subtasks</a>
-                  <?php if ($h['habit_nature'] === 'bad'): ?>
-                    <a href="../bad-habit-progress/bad-habit-progress.php?habit_id=<?php echo $h['habit_id']; ?>" class="link-coral">Log progress</a>
-                  <?php endif; ?>
-                  <form method="POST" action="habits.php">
-                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                    <input type="hidden" name="action" value="delete">
-                    <input type="hidden" name="habit_id" value="<?php echo $h['habit_id']; ?>">
-                    <button type="submit" class="btn-delete">Delete</button>
-                  </form>
-                </div>
-              </div>
+              <?php $isEditing = ($editHabitId !== null && (int) $h['habit_id'] === (int) $editHabitId); ?>
+
+              <?php if ($isEditing): ?>
+                <?php $ev = $editValues ?? $h; ?>
+                <tr class="edit-row" id="habit-<?php echo $h['habit_id']; ?>">
+                  <td colspan="5">
+                    <form method="POST" action="habits.php?page=<?php echo $page; ?>">
+                      <input type="hidden" name="action" value="update">
+                      <input type="hidden" name="habit_id" value="<?php echo $h['habit_id']; ?>">
+
+                      <div class="field"><input type="text" name="habit_name" value="<?php echo htmlspecialchars((string) $ev['habit_name']); ?>" required></div>
+
+                      <div class="field">
+                        <select name="category_id" required class="select-input">
+                          <?php foreach ($categories as $cat): ?>
+                            <option value="<?php echo $cat['category_id']; ?>" <?php echo ((int) $cat['category_id'] === (int) $ev['category_id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($cat['category_name']); ?></option>
+                          <?php endforeach; ?>
+                        </select>
+                      </div>
+
+                      <div class="field">
+                        <select name="habit_nature" class="select-input">
+                          <option value="good" <?php echo $ev['habit_nature'] === 'good' ? 'selected' : ''; ?>>Good habit</option>
+                          <option value="bad" <?php echo $ev['habit_nature'] === 'bad' ? 'selected' : ''; ?>>Bad habit</option>
+                        </select>
+                      </div>
+
+                      <div class="field">
+                        <select name="measurement_type" class="select-input measurement-select">
+                          <option value="boolean" <?php echo $ev['measurement_type'] === 'boolean' ? 'selected' : ''; ?>>Simple (yes/no)</option>
+                          <option value="count" <?php echo $ev['measurement_type'] === 'count' ? 'selected' : ''; ?>>Count (e.g. glasses of water)</option>
+                          <option value="duration" <?php echo $ev['measurement_type'] === 'duration' ? 'selected' : ''; ?>>Duration (minutes)</option>
+                        </select>
+                      </div>
+
+                      <div class="field target-value-field"><input type="number" name="target_value" value="<?php echo $ev['target_value'] !== null ? (int) $ev['target_value'] : ''; ?>" placeholder="Target value (if count/duration)"></div>
+
+                      <div class="field">
+                        <select name="target_type" class="select-input">
+                          <option value="daily" <?php echo $ev['target_type'] === 'daily' ? 'selected' : ''; ?>>Daily</option>
+                          <option value="twice a week" <?php echo $ev['target_type'] === 'twice a week' ? 'selected' : ''; ?>>Twice a week</option>
+                          <option value="weekly" <?php echo $ev['target_type'] === 'weekly' ? 'selected' : ''; ?>>Weekly</option>
+                        </select>
+                      </div>
+
+                      <div class="field"><input type="text" name="description" value="<?php echo htmlspecialchars((string) ($ev['description'] ?? '')); ?>" placeholder="Description (optional)"></div>
+
+                      <div class="edit-form-actions">
+                        <button type="submit" class="btn-primary">Save changes</button>
+                        <a href="habits.php?page=<?php echo $page; ?>" class="btn-cancel">Cancel</a>
+                      </div>
+                    </form>
+                  </td>
+                </tr>
+
+              <?php else: ?>
+                <tr id="habit-<?php echo $h['habit_id']; ?>">
+                  <td><?php echo htmlspecialchars($h['habit_name']); ?></td>
+                  <td><?php echo htmlspecialchars($h['category_name']); ?></td>
+                  <td><span class="badge-<?php echo $h['habit_nature']; ?>"><?php echo ucfirst($h['habit_nature']); ?></span></td>
+                  <td><?php echo ucfirst($h['target_type']); ?></td>
+                  <td class="actions-cell">
+                    <a href="habits.php?page=<?php echo $page; ?>&edit_habit_id=<?php echo $h['habit_id']; ?>#habit-<?php echo $h['habit_id']; ?>" class="btn-edit">Edit</a>
+                    <a href="../subtasks/subtasks.php?habit_id=<?php echo $h['habit_id']; ?>" class="link-purple">Manage subtasks</a>
+                    <?php if ($h['habit_nature'] === 'bad'): ?>
+                      <a href="../bad-habit-progress/bad-habit-progress.php?habit_id=<?php echo $h['habit_id']; ?>" class="link-coral">Log progress</a>
+                    <?php endif; ?>
+                    <form method="POST" action="habits.php?page=<?php echo $page; ?>">
+                      <input type="hidden" name="action" value="delete">
+                      <input type="hidden" name="habit_id" value="<?php echo $h['habit_id']; ?>">
+                      <button type="submit" class="btn-delete">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              <?php endif; ?>
             <?php endforeach; ?>
+          </tbody>
+        </table>
+
+        <?php if ($totalPages > 1): ?>
+          <div class="list-pagination">
+            <?php if ($page > 1): ?>
+              <a class="pagination-link" href="habits.php?page=<?php echo $page - 1; ?>">Previous</a>
+            <?php endif; ?>
+
+            <span class="pagination-status">Page <?php echo $page; ?> of <?php echo $totalPages; ?></span>
+
+            <?php if ($page < $totalPages): ?>
+              <a class="pagination-link" href="habits.php?page=<?php echo $page + 1; ?>">Next</a>
+            <?php endif; ?>
           </div>
         <?php endif; ?>
+      <?php endif; ?>
 
-      </div>
     </div>
   </div>
+  <script src="habits.js"></script>
 </body>
 </html>

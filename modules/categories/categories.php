@@ -72,6 +72,7 @@ mysqli_stmt_close($stmt);
 <head>
   <title>Categories — Habit Track</title>
   <link rel="stylesheet" href="categories.css?v=20260801-2">
+  <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
   <div class="app-layout">
@@ -80,6 +81,7 @@ mysqli_stmt_close($stmt);
       <a href="../dashboard/dashboard.php" class="nav-item">Dashboard</a>
       <a href="../habits/habits.php" class="nav-item">Habits</a>
       <a href="categories.php" class="nav-item active">Categories</a>
+      <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>

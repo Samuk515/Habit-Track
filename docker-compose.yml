@@ -1,8 +1,9 @@
-version: '3.8'
+version: "3.8"
 
 services:
   web:
     build: .
+    container_name: habittrack_web
     ports:
       - "8080:80"
     environment:
@@ -17,6 +18,7 @@ services:
 
   db:
     image: mysql:8.0
+    container_name: habittrack_db
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -29,6 +31,7 @@ services:
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
+    container_name: habittrack_phpmyadmin
     restart: always
     ports:
       - "8081:80"
@@ -38,5 +41,6 @@ services:
       PMA_PASSWORD: root
     depends_on:
       - db
+
 volumes:
   db_data:

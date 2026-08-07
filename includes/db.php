@@ -15,3 +15,12 @@ if (!$conn) {
 }
 
 mysqli_set_charset($conn, $charset);
+
+mysqli_query($conn, "CREATE TABLE IF NOT EXISTS REMINDER (
+    reminder_id INT AUTO_INCREMENT PRIMARY KEY,
+    subtask_id INT NOT NULL,
+    reminder_time TIME NOT NULL,
+    reminder_type ENUM('once', 'daily', 'weekly') NOT NULL DEFAULT 'daily',
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    FOREIGN KEY (subtask_id) REFERENCES SUBTASK(subtask_id) ON DELETE CASCADE
+)");

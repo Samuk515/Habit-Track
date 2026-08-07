@@ -26,8 +26,10 @@
 	margin-bottom: 14px;
 }
 
-.btn-done {
+.btn-done:disabled {
 	background: #1DD1A1;
+	opacity: 0.8;
+	cursor: default;
 }
 
 .habit-bad-link {
