@@ -89,8 +89,8 @@ mysqli_stmt_close($stmt);
 <html>
 <head>
   <title>Dashboard — Habit Track</title>
-  <link rel="stylesheet" href="dashboard.css?v=20260801-2">
   <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="dashboard.css?v=20260801-2">
 </head>
 <body>
   <div class="app-layout">

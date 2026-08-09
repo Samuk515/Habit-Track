@@ -135,8 +135,8 @@ mysqli_stmt_close($reminderStmt);
 <html>
 <head>
   <title>Reminders — Habit Track</title>
-  <link rel="stylesheet" href="reminders.css?v=20260801-2">
   <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="reminders.css?v=20260801-2">
 </head>
 <body>
   <div class="app-layout">

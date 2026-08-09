@@ -83,7 +83,9 @@
 .field-checkbox {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 8px;
+    width: 100%;
 }
 
 .checkbox-input {
@@ -165,5 +167,45 @@
     border-radius: 8px;
     padding: 6px 12px;
     font-size: 13px;
+    cursor: pointer;
+}
+
+.btn-log {
+    background: none;
+    border: 1px solid #1DD1A1;
+    color: #1DD1A1;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.badge-logged {
+    background: #1DD1A122;
+    color: #1DD1A1;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.today-other-note {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+}
+
+.reorder-form {
+    display: inline-block;
+}
+
+.btn-reorder {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
     cursor: pointer;
 }

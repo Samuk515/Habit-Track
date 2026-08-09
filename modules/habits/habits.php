@@ -5,6 +5,44 @@ requireLogin();
 require __DIR__ . '/../../includes/functions.php';
 require __DIR__ . '/../../includes/db.php';
 
+// Bounded types get a min/max check; everything else just needs to be
+// a non-negative whole number. boolean/partial skip target_value
+// entirely (handled separately, below).
+const MEASUREMENT_TYPES = ['boolean', 'count', 'duration', 'weight', 'distance', 'rating', 'percentage', 'steps', 'custom', 'money', 'time_of_day', 'score', 'volume', 'partial'];
+const NO_TARGET_TYPES = ['boolean', 'partial'];
+const BOUNDED_TYPES = [
+    'rating' => [1, 5],
+    'percentage' => [0, 100],
+];
+
+// time_of_day is stored as minutes-since-midnight in the same INT
+// column everything else uses — there's no separate time column in
+// the locked schema, so this is the compliant way to fit a clock
+// time into target_value without an ER change.
+function formatTargetValueForInput(string $measurementType, ?int $targetValue): string
+{
+    if ($targetValue === null) {
+        return '';
+    }
+    if ($measurementType === 'time_of_day') {
+        $hh = intdiv($targetValue, 60);
+        $mm = $targetValue % 60;
+        return sprintf('%02d:%02d', $hh, $mm);
+    }
+    return (string) $targetValue;
+}
+
+function formatTargetValueForDisplay(string $measurementType, ?int $targetValue): string
+{
+    if ($targetValue === null) {
+        return '—';
+    }
+    if ($measurementType === 'time_of_day') {
+        return formatTargetValueForInput($measurementType, $targetValue);
+    }
+    return (string) $targetValue;
+}
+
 $errors = [];
 $userId = (int) $_SESSION['user_id'];
 $perPage = 10;
@@ -31,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $categoryId = $_POST['category_id'] ?? '';
         $habitNature = $_POST['habit_nature'] ?? '';
         $measurementType = $_POST['measurement_type'] ?? '';
-        $targetValue = trim($_POST['target_value'] ?? '');
+        $targetValueRaw = trim($_POST['target_value'] ?? '');
         $targetType = $_POST['target_type'] ?? '';
         $description = trim($_POST['description'] ?? '');
 
@@ -54,22 +92,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Please select a valid habit type.';
         }
 
-        if (!in_array($measurementType, ['boolean', 'count', 'duration'], true)) {
+        if (!in_array($measurementType, MEASUREMENT_TYPES, true)) {
             $errors[] = 'Please select a valid measurement type.';
         }
 
-        // Three options now, not two — matches the widened target_type
-        // column (see the ALTER statement note alongside this file).
         if (!in_array($targetType, ['daily', 'twice a week', 'weekly'], true)) {
             $errors[] = 'Please select a valid target type.';
         }
 
-        if ($targetValue === '') {
+        // Target value handling branches by type: no-target types
+        // ignore whatever was submitted, time_of_day expects "HH:MM"
+        // and gets encoded to minutes-since-midnight, everything else
+        // is a plain whole number (with bounds checked where relevant).
+        $targetValue = null;
+        if (in_array($measurementType, NO_TARGET_TYPES, true)) {
             $targetValue = null;
-        } elseif (filter_var($targetValue, FILTER_VALIDATE_INT) === false) {
+        } elseif ($measurementType === 'time_of_day') {
+            if ($targetValueRaw !== '') {
+                if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $targetValueRaw)) {
+                    $errors[] = 'Please enter a valid time.';
+                } else {
+                    [$hh, $mm] = explode(':', $targetValueRaw);
+                    $targetValue = ((int) $hh) * 60 + (int) $mm;
+                }
+            }
+        } elseif ($targetValueRaw === '') {
+            $targetValue = null;
+        } elseif (filter_var($targetValueRaw, FILTER_VALIDATE_INT) === false) {
             $errors[] = 'Target value must be a whole number.';
         } else {
-            $targetValue = (int) $targetValue;
+            $targetValue = (int) $targetValueRaw;
+            if (isset(BOUNDED_TYPES[$measurementType])) {
+                [$min, $max] = BOUNDED_TYPES[$measurementType];
+                if ($targetValue < $min || $targetValue > $max) {
+                    $errors[] = "Target value must be between $min and $max.";
+                }
+            } elseif ($targetValue < 0) {
+                $errors[] = 'Target value cannot be negative.';
+            }
         }
 
         if ($action === 'add') {
@@ -100,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = mysqli_prepare($conn, 'UPDATE HABIT
                     SET habit_name = ?, category_id = ?, habit_nature = ?, measurement_type = ?, target_value = ?, target_type = ?, description = ?
                     WHERE habit_id = ? AND category_id IN (SELECT category_id FROM CATEGORY WHERE user_id = ?)');
-                mysqli_stmt_bind_param($stmt, 'sissisiii', $habitName, $categoryId, $habitNature, $measurementType, $targetValue, $targetType, $description, $habitId, $userId);
+                mysqli_stmt_bind_param($stmt, 'sississii', $habitName, $categoryId, $habitNature, $measurementType, $targetValue, $targetType, $description, $habitId, $userId);
                 mysqli_stmt_execute($stmt);
                 $affected = mysqli_stmt_affected_rows($stmt);
                 mysqli_stmt_close($stmt);
@@ -170,13 +230,30 @@ mysqli_stmt_execute($habitStmt);
 $habitResult = mysqli_stmt_get_result($habitStmt);
 $habits = mysqli_fetch_all($habitResult, MYSQLI_ASSOC);
 mysqli_stmt_close($habitStmt);
+
+$measurementLabels = [
+    'boolean' => 'Simple (yes/no)',
+    'count' => 'Count',
+    'duration' => 'Duration (min)',
+    'weight' => 'Weight (kg)',
+    'distance' => 'Distance (km)',
+    'rating' => 'Rating (1–5)',
+    'percentage' => 'Percentage',
+    'steps' => 'Steps',
+    'custom' => 'Custom',
+    'money' => 'Money (Rs.)',
+    'time_of_day' => 'Time of day',
+    'score' => 'Score',
+    'volume' => 'Volume (ml)',
+    'partial' => 'Partial completion',
+];
 ?>
 <!DOCTYPE html>
 <html>
 <head>
   <title>Habits — Habit Track</title>
-  <link rel="stylesheet" href="habits.css?v=20260801-4">
   <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="habits.css?v=20260801-6">
 </head>
 <body>
   <div class="app-layout">
@@ -196,6 +273,17 @@ mysqli_stmt_close($habitStmt);
       <?php foreach ($errors as $err): ?>
         <div class="error-box"><?php echo htmlspecialchars($err); ?></div>
       <?php endforeach; ?>
+
+      <?php
+      // Shared across the Add form and every Edit form — one place to
+      // change the option list rather than duplicating it per form.
+      $renderMeasurementOptions = function (string $selected) use ($measurementLabels) {
+          foreach ($measurementLabels as $value => $label) {
+              $sel = $value === $selected ? 'selected' : '';
+              echo "<option value=\"" . htmlspecialchars($value) . "\" $sel>" . htmlspecialchars($label) . "</option>";
+          }
+      };
+      ?>
 
       <?php if (empty($categories)): ?>
         <div class="empty-state">
@@ -227,13 +315,11 @@ mysqli_stmt_close($habitStmt);
 
             <div class="field">
               <select name="measurement_type" class="select-input measurement-select">
-                <option value="boolean">Simple (yes/no)</option>
-                <option value="count">Count (e.g. glasses of water)</option>
-                <option value="duration">Duration (minutes)</option>
+                <?php $renderMeasurementOptions('boolean'); ?>
               </select>
             </div>
 
-            <div class="field target-value-field"><input type="number" name="target_value" placeholder="Target value (if count/duration)"></div>
+            <div class="field target-value-field"><input type="number" name="target_value" placeholder="Target value"></div>
 
             <div class="field">
               <select name="target_type" class="select-input">
@@ -259,6 +345,8 @@ mysqli_stmt_close($habitStmt);
               <th>Habit</th>
               <th>Category</th>
               <th>Type</th>
+              <th>Measure</th>
+              <th>Target</th>
               <th>Frequency</th>
               <th>Actions</th>
             </tr>
@@ -270,7 +358,7 @@ mysqli_stmt_close($habitStmt);
               <?php if ($isEditing): ?>
                 <?php $ev = $editValues ?? $h; ?>
                 <tr class="edit-row" id="habit-<?php echo $h['habit_id']; ?>">
-                  <td colspan="5">
+                  <td colspan="7">
                     <form method="POST" action="habits.php?page=<?php echo $page; ?>">
                       <input type="hidden" name="action" value="update">
                       <input type="hidden" name="habit_id" value="<?php echo $h['habit_id']; ?>">
@@ -294,13 +382,13 @@ mysqli_stmt_close($habitStmt);
 
                       <div class="field">
                         <select name="measurement_type" class="select-input measurement-select">
-                          <option value="boolean" <?php echo $ev['measurement_type'] === 'boolean' ? 'selected' : ''; ?>>Simple (yes/no)</option>
-                          <option value="count" <?php echo $ev['measurement_type'] === 'count' ? 'selected' : ''; ?>>Count (e.g. glasses of water)</option>
-                          <option value="duration" <?php echo $ev['measurement_type'] === 'duration' ? 'selected' : ''; ?>>Duration (minutes)</option>
+                          <?php $renderMeasurementOptions((string) $ev['measurement_type']); ?>
                         </select>
                       </div>
 
-                      <div class="field target-value-field"><input type="number" name="target_value" value="<?php echo $ev['target_value'] !== null ? (int) $ev['target_value'] : ''; ?>" placeholder="Target value (if count/duration)"></div>
+                      <div class="field target-value-field">
+                        <input type="number" name="target_value" value="<?php echo htmlspecialchars(formatTargetValueForInput((string) $ev['measurement_type'], $ev['target_value'] !== null ? (int) $ev['target_value'] : null)); ?>" placeholder="Target value">
+                      </div>
 
                       <div class="field">
                         <select name="target_type" class="select-input">
@@ -325,6 +413,8 @@ mysqli_stmt_close($habitStmt);
                   <td><?php echo htmlspecialchars($h['habit_name']); ?></td>
                   <td><?php echo htmlspecialchars($h['category_name']); ?></td>
                   <td><span class="badge-<?php echo $h['habit_nature']; ?>"><?php echo ucfirst($h['habit_nature']); ?></span></td>
+                  <td><?php echo htmlspecialchars($measurementLabels[$h['measurement_type']] ?? $h['measurement_type']); ?></td>
+                  <td><?php echo htmlspecialchars(formatTargetValueForDisplay($h['measurement_type'], $h['target_value'] !== null ? (int) $h['target_value'] : null)); ?></td>
                   <td><?php echo ucfirst($h['target_type']); ?></td>
                   <td class="actions-cell">
                     <a href="habits.php?page=<?php echo $page; ?>&edit_habit_id=<?php echo $h['habit_id']; ?>#habit-<?php echo $h['habit_id']; ?>" class="btn-edit">Edit</a>

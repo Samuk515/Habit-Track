@@ -128,8 +128,8 @@ mysqli_stmt_close($progressStmt);
 <html>
 <head>
   <title>Progress — Habit Track</title>
-  <link rel="stylesheet" href="bad-habit-progress.css?v=20260801-2">
   <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="bad-habit-progress.css?v=20260801-2">
 </head>
 <body>
   <div class="app-layout">
