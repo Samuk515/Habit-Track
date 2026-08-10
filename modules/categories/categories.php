@@ -105,6 +105,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             SELECT habit_id FROM HABIT WHERE category_id = ?
                         )
                     )',
+                    'DELETE FROM CALENDAR_EVENT WHERE subtask_id IN (
+                        SELECT subtask_id FROM SUBTASK WHERE habit_id IN (
+                            SELECT habit_id FROM HABIT WHERE category_id = ?
+                        )
+                    )',
                     'DELETE FROM REMINDER WHERE subtask_id IN (
                         SELECT subtask_id FROM SUBTASK WHERE habit_id IN (
                             SELECT habit_id FROM HABIT WHERE category_id = ?
@@ -199,6 +204,7 @@ mysqli_stmt_close($catStmt);
       <a href="../habits/habits.php" class="nav-item">Habits</a>
       <a href="categories.php" class="nav-item active">Categories</a>
       <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
+      <a href="../calendar/calendar.php" class="nav-item">Calendar</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>

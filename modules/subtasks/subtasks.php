@@ -133,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Confirm this subtask actually belongs to the
             // verified-owned habit before logging against it.
-            $subCheckStmt = mysqli_prepare($conn, 'SELECT subtask_id FROM SUBTASK WHERE subtask_id = ? AND habit_id = ?');
+            $subCheckStmt = mysqli_prepare($conn, 'SELECT subtask_id, subtask_name FROM SUBTASK WHERE subtask_id = ? AND habit_id = ?');
             mysqli_stmt_bind_param($subCheckStmt, 'ii', $logSubtaskId, $habitId);
             mysqli_stmt_execute($subCheckStmt);
             $subCheckResult = mysqli_stmt_get_result($subCheckStmt);
@@ -181,7 +181,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         mysqli_stmt_bind_param($insertStmt, 'iiis', $habitId, $logSubtaskId, $logValue, $logUnit);
                         mysqli_stmt_execute($insertStmt);
                         mysqli_stmt_close($insertStmt);
+                        $logId = (int) mysqli_insert_id($conn);
                     }
+
+                    // Auto-populate the calendar from this subtask
+                    // activity — this is the ONLY place CALENDAR_EVENT
+                    // rows get created anywhere in the app, per the
+                    // "no manual event creation" requirement. Clear any
+                    // previous event tied to this exact log row first,
+                    // so re-logging the same day updates the calendar
+                    // entry instead of duplicating it.
+                    $clearEventStmt = mysqli_prepare($conn, "DELETE FROM CALENDAR_EVENT WHERE ref_id = ? AND event_type = 'subtask_log'");
+                    mysqli_stmt_bind_param($clearEventStmt, 'i', $logId);
+                    mysqli_stmt_execute($clearEventStmt);
+                    mysqli_stmt_close($clearEventStmt);
+
+                    $eventLabel = $subCheckRow['subtask_name'];
+                    if ($logValue !== null) {
+                        $eventLabel .= ' (' . $logValue . ($logUnit ? ' ' . $logUnit : '') . ')';
+                    }
+
+                    $insertEventStmt = mysqli_prepare($conn, "INSERT INTO CALENDAR_EVENT (subtask_id, label, event_date, event_type, ref_id) VALUES (?, ?, CURDATE(), 'subtask_log', ?)");
+                    mysqli_stmt_bind_param($insertEventStmt, 'isi', $logSubtaskId, $eventLabel, $logId);
+                    mysqli_stmt_execute($insertEventStmt);
+                    mysqli_stmt_close($insertEventStmt);
 
                     // Any write to HABIT_LOG affects the habit's streak,
                     // regardless of which page/action produced the row.
@@ -203,6 +226,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (filter_var($logSubtaskId, FILTER_VALIDATE_INT) !== false) {
             $logSubtaskId = (int) $logSubtaskId;
+
+            // Find the log_id first, so its calendar event can be
+            // cleaned up before the HABIT_LOG row itself is gone —
+            // once deleted, there's nothing left to look ref_id up by.
+            $findStmt = mysqli_prepare($conn, 'SELECT log_id FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE() AND subhabit_id = ?');
+            mysqli_stmt_bind_param($findStmt, 'ii', $habitId, $logSubtaskId);
+            mysqli_stmt_execute($findStmt);
+            $findResult = mysqli_stmt_get_result($findStmt);
+            $foundLog = mysqli_fetch_assoc($findResult);
+            mysqli_stmt_close($findStmt);
+
+            if ($foundLog) {
+                $logIdToClear = (int) $foundLog['log_id'];
+                $clearEventStmt = mysqli_prepare($conn, "DELETE FROM CALENDAR_EVENT WHERE ref_id = ? AND event_type = 'subtask_log'");
+                mysqli_stmt_bind_param($clearEventStmt, 'i', $logIdToClear);
+                mysqli_stmt_execute($clearEventStmt);
+                mysqli_stmt_close($clearEventStmt);
+            }
 
             // Only clears if today's log actually belongs to THIS
             // subtask — prevents wiping a different subtask's log via
@@ -312,8 +353,7 @@ mysqli_stmt_close($subtaskStmt);
 <html>
 <head>
   <title>Subtasks — Habit Track</title>
-  <link rel="stylesheet" href="/assets/css/style.css">
-  <link rel="stylesheet" href="subtasks.css?v=20260801-6">
+  <link rel="stylesheet" href="subtasks.css?v=20260801-5">
 </head>
 <body>
   <div class="app-layout">
@@ -323,6 +363,7 @@ mysqli_stmt_close($subtaskStmt);
       <a href="../habits/habits.php" class="nav-item active">Habits</a>
       <a href="../categories/categories.php" class="nav-item">Categories</a>
       <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
+      <a href="../calendar/calendar.php" class="nav-item">Calendar</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>

@@ -2,7 +2,6 @@
 declare(strict_types=1);
 require __DIR__ . '/../../includes/auth.php';
 requireLogin();
-require __DIR__ . '/../../includes/csrf.php';
 require __DIR__ . '/../../includes/functions.php';
 require __DIR__ . '/../../includes/db.php';
 
@@ -24,10 +23,6 @@ $subtaskOptions = mysqli_fetch_all($subtaskOptResult, MYSQLI_ASSOC);
 mysqli_stmt_close($subtaskOptStmt);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-        die('Invalid request.');
-    }
-
     $action = $_POST['action'] ?? '';
 
     if ($action === 'add') {
@@ -135,7 +130,6 @@ mysqli_stmt_close($reminderStmt);
 <html>
 <head>
   <title>Reminders — Habit Track</title>
-  <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="reminders.css?v=20260801-2">
 </head>
 <body>
@@ -146,6 +140,7 @@ mysqli_stmt_close($reminderStmt);
       <a href="../habits/habits.php" class="nav-item">Habits</a>
       <a href="../categories/categories.php" class="nav-item">Categories</a>
       <a href="reminders.php" class="nav-item active">Reminders</a>
+      <a href="../calendar/calendar.php" class="nav-item">Calendar</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
@@ -165,7 +160,6 @@ mysqli_stmt_close($reminderStmt);
       <?php else: ?>
         <div class="auth-card reminder-form-card">
           <form method="POST" action="reminders.php">
-            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
             <input type="hidden" name="action" value="add">
 
             <div class="field">
@@ -205,13 +199,11 @@ mysqli_stmt_close($reminderStmt);
               </div>
               <div class="reminder-actions">
                 <form method="POST" action="reminders.php">
-                  <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                   <input type="hidden" name="action" value="toggle_active">
                   <input type="hidden" name="reminder_id" value="<?php echo $r['reminder_id']; ?>">
                   <button type="submit" class="btn-toggle"><?php echo $r['is_active'] ? 'Pause' : 'Resume'; ?></button>
                 </form>
                 <form method="POST" action="reminders.php">
-                  <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                   <input type="hidden" name="action" value="delete">
                   <input type="hidden" name="reminder_id" value="<?php echo $r['reminder_id']; ?>">
                   <button type="submit" class="btn-delete">Delete</button>

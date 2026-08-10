@@ -160,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = mysqli_prepare($conn, 'UPDATE HABIT
                     SET habit_name = ?, category_id = ?, habit_nature = ?, measurement_type = ?, target_value = ?, target_type = ?, description = ?
                     WHERE habit_id = ? AND category_id IN (SELECT category_id FROM CATEGORY WHERE user_id = ?)');
-                mysqli_stmt_bind_param($stmt, 'sississii', $habitName, $categoryId, $habitNature, $measurementType, $targetValue, $targetType, $description, $habitId, $userId);
+                mysqli_stmt_bind_param($stmt, 'sissisiii', $habitName, $categoryId, $habitNature, $measurementType, $targetValue, $targetType, $description, $habitId, $userId);
                 mysqli_stmt_execute($stmt);
                 $affected = mysqli_stmt_affected_rows($stmt);
                 mysqli_stmt_close($stmt);
@@ -263,6 +263,7 @@ $measurementLabels = [
       <a href="habits.php" class="nav-item active">Habits</a>
       <a href="../categories/categories.php" class="nav-item">Categories</a>
       <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
+      <a href="../calendar/calendar.php" class="nav-item">Calendar</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>

@@ -2,7 +2,6 @@
 declare(strict_types=1);
 require __DIR__ . '/../../includes/auth.php';
 requireLogin();
-require __DIR__ . '/../../includes/csrf.php';
 require __DIR__ . '/../../includes/functions.php';
 require __DIR__ . '/../../includes/db.php';
 
@@ -10,10 +9,6 @@ $userId = (int) $_SESSION['user_id'];
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-        die('Invalid request.');
-    }
-
     $action = $_POST['action'] ?? '';
 
     if ($action === 'toggle_done') {
@@ -54,14 +49,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $todayLog = mysqli_fetch_assoc($logResult);
             mysqli_stmt_close($logStmt);
 
-          if (!$todayLog) {
+            if ($todayLog) {
+                $logId = (int) $todayLog['log_id'];
+                $deleteStmt = mysqli_prepare($conn, 'DELETE FROM HABIT_LOG WHERE log_id = ?');
+                mysqli_stmt_bind_param($deleteStmt, 'i', $logId);
+                mysqli_stmt_execute($deleteStmt);
+                mysqli_stmt_close($deleteStmt);
+            } else {
                 $insertStmt = mysqli_prepare($conn, "INSERT INTO HABIT_LOG (habit_id, log_date, status) VALUES (?, CURDATE(), 'done')");
                 mysqli_stmt_bind_param($insertStmt, 'i', $habitId);
                 mysqli_stmt_execute($insertStmt);
                 mysqli_stmt_close($insertStmt);
+            }
 
             calculateAndSaveStreak($conn, $habitId);
-            }
 
             redirect('dashboard.php');
         }
@@ -100,6 +101,7 @@ mysqli_stmt_close($stmt);
       <a href="../habits/habits.php" class="nav-item">Habits</a>
       <a href="../categories/categories.php" class="nav-item">Categories</a>
       <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
+      <a href="../calendar/calendar.php" class="nav-item">Calendar</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
@@ -127,16 +129,13 @@ mysqli_stmt_close($stmt);
                 <div class="habit-streak">🔥 <?php echo (int) $h['current_streak']; ?></div>
               <?php endif; ?>
               <div class="habit-name"><?php echo htmlspecialchars($h['habit_name']); ?></div>
-              <?php if ($isDone): ?>
-                <button type="button" class="btn-primary btn-done" disabled>Done</button>
-              <?php else: ?>
-                <form method="POST" action="dashboard.php">
-                  <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                  <input type="hidden" name="action" value="toggle_done">
-                  <input type="hidden" name="habit_id" value="<?php echo $h['habit_id']; ?>">
-                  <button type="submit" class="btn-primary">Mark done</button>
-                </form>
-              <?php endif; ?>
+              <form method="POST" action="dashboard.php">
+                <input type="hidden" name="action" value="toggle_done">
+                <input type="hidden" name="habit_id" value="<?php echo $h['habit_id']; ?>">
+                <button type="submit" class="btn-primary<?php echo $isDone ? ' btn-done' : ''; ?>">
+                  <?php echo $isDone ? '✓ Done' : 'Mark done'; ?>
+                </button>
+              </form>
               <?php if ($h['habit_nature'] === 'bad'): ?>
                 <a href="../bad-habit-progress/bad-habit-progress.php?habit_id=<?php echo $h['habit_id']; ?>" class="habit-bad-link">Log occurrence</a>
               <?php endif; ?>

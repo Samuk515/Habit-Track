@@ -2,7 +2,6 @@
 declare(strict_types=1);
 require __DIR__ . '/../../includes/auth.php';
 requireLogin();
-require __DIR__ . '/../../includes/csrf.php';
 require __DIR__ . '/../../includes/functions.php';
 require __DIR__ . '/../../includes/db.php';
 
@@ -32,10 +31,6 @@ if ($habit['habit_nature'] !== 'bad') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-        die('Invalid request.');
-    }
 
     $action = $_POST['action'] ?? '';
 
@@ -128,7 +123,6 @@ mysqli_stmt_close($progressStmt);
 <html>
 <head>
   <title>Progress — Habit Track</title>
-  <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="bad-habit-progress.css?v=20260801-2">
 </head>
 <body>
@@ -139,6 +133,7 @@ mysqli_stmt_close($progressStmt);
       <a href="../habits/habits.php" class="nav-item active">Habits</a>
       <a href="../categories/categories.php" class="nav-item">Categories</a>
       <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
+      <a href="../calendar/calendar.php" class="nav-item">Calendar</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
@@ -155,7 +150,6 @@ mysqli_stmt_close($progressStmt);
 
       <div class="auth-card progress-form-card">
         <form method="POST" action="bad-habit-progress.php?habit_id=<?php echo $habitId; ?>">
-          <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
           <input type="hidden" name="action" value="add">
           <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
 
@@ -182,7 +176,6 @@ mysqli_stmt_close($progressStmt);
                 <?php endif; ?>
               </div>
               <form method="POST" action="bad-habit-progress.php?habit_id=<?php echo $habitId; ?>">
-                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
                 <input type="hidden" name="progress_id" value="<?php echo $p['progress_id']; ?>">
