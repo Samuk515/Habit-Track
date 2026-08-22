@@ -32,5 +32,7 @@ mysqli_query($conn, "CREATE TABLE IF NOT EXISTS CALENDAR_EVENT (
     event_date DATE NOT NULL,
     event_type VARCHAR(50) NOT NULL,
     ref_id INT NULL,
-    FOREIGN KEY (subtask_id) REFERENCES SUBTASK(subtask_id) ON DELETE CASCADE
+    FOREIGN KEY (subtask_id) REFERENCES SUBTASK(subtask_id) ON DELETE CASCADE,
+    FOREIGN KEY (ref_id) REFERENCES HABIT_LOG(log_id) ON DELETE CASCADE
 )");
+;

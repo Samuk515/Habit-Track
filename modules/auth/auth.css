@@ -18,7 +18,7 @@
 }
 
 body {
-    background: var(--bg);
+    background: var(--bg) url('../../assets/images/habits.jpeg') center/cover no-repeat fixed !important;
     color: var(--text);
     font-family: 'Segoe UI', sans-serif;
     min-height: 100vh;

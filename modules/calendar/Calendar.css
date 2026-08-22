@@ -2,10 +2,141 @@
     margin-top: auto;
 }
 
-.calendar-subtitle {
+
+.calendar-widget {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
+    max-width: 380px;
+}
+
+.calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 16px;
+}
+
+.calendar-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--purple-dark);
+    min-width: 180px;
+    text-align: center;
+    margin: 0;
+}
+
+.btn-cal-nav {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--purple);
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+}
+
+.cal-weekday {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 6px 0;
+}
+
+.cal-day {
+    aspect-ratio: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+    padding: 0;
+}
+
+.cal-day-empty {
+    background: transparent;
+    border: none;
+    cursor: default;
+}
+
+.cal-day-today {
+    border-color: var(--purple);
+    font-weight: 700;
+}
+
+.cal-day-has-events {
+    background: #1DD1A122;
+}
+
+.cal-day-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #1DD1A1;
+    margin-top: 2px;
+}
+
+.calendar-day-detail {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.calendar-day-detail h3 {
+    font-size: 14px;
+    color: var(--purple-dark);
+    margin: 0 0 8px;
+}
+
+.cal-detail-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+}
+
+.cal-detail-list li {
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+    padding: 8px 12px;
+    border-radius: 8px;
+}
+
+.cal-detail-empty {
     font-size: 13px;
     color: var(--muted);
-    margin-bottom: 20px;
+    margin: 0;
+}
+
+.section-heading {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--purple-dark);
+    margin: 24px 0 12px;
+}
+
+.calendar-empty-below {
+    margin-top: 24px;
 }
 
 .data-table {

@@ -353,6 +353,7 @@ mysqli_stmt_close($subtaskStmt);
 <html>
 <head>
   <title>Subtasks — Habit Track</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="subtasks.css?v=20260801-5">
 </head>
 <body>

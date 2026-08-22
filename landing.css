@@ -1,0 +1,247 @@
+:root {
+    --purple: #0474C4;
+    --purple-dark: #2C444C;
+    --teal: #5379AE;
+    --text: #262B40;
+    --accent-light: #A8C4EC;
+    --coral: #FF6B6B;
+    --success: #1DD1A1;
+    --amber: #FF9F43;
+    --bg: #F7F7FB;
+    --card: #EAF2FB;
+    --muted: #8A92A6;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.landing-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 40px;
+    max-width: min(94%, 1400px);
+    margin: 0 auto;
+}
+
+.landing-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+}
+
+.logo img {
+    display: block;
+}
+
+.logo-text {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--purple-dark);
+}
+
+.landing-nav {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.btn-nav-login {
+    color: var(--purple-dark);
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    padding: 8px 16px;
+}
+
+.btn-nav-signup {
+    background: var(--purple);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    text-decoration: none;
+    padding: 9px 18px;
+    border-radius: 8px;
+}
+
+.hero {
+    max-width: min(90%, 800px);
+    margin: 60px auto 80px;
+    text-align: center;
+    padding: 0 20px;
+}
+
+.hero h1 {
+    font-size: 40px;
+    font-weight: 800;
+    color: var(--purple-dark);
+    line-height: 1.2;
+    margin-bottom: 18px;
+}
+
+.hero-subtitle {
+    font-size: 17px;
+    color: var(--teal);
+    margin-bottom: 32px;
+    line-height: 1.5;
+}
+
+.hero-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.btn-hero-primary {
+    background: var(--purple);
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    text-decoration: none;
+    padding: 14px 28px;
+    border-radius: 10px;
+}
+
+.btn-hero-secondary {
+    color: var(--purple-dark);
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.features {
+    max-width: min(94%, 1400px);
+    margin: 0 auto 80px;
+    padding: 0 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+}
+
+.feature-card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 26px 22px;
+    text-align: left;
+}
+
+.feature-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 14px;
+}
+
+.feature-icon--category { background: var(--purple); }
+.feature-icon--habit { background: var(--purple-dark); }
+.feature-icon--reminder { background: var(--coral); }
+.feature-icon--progress { background: var(--teal); }
+
+.feature-card h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--purple-dark);
+    margin-bottom: 8px;
+}
+
+.feature-card p {
+    font-size: 13px;
+    color: var(--teal);
+    line-height: 1.5;
+}
+
+.how-it-works {
+    max-width: min(94%, 1100px);
+    margin: 0 auto 80px;
+    padding: 0 20px;
+    text-align: center;
+}
+
+.hiw-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--purple-dark);
+    margin-bottom: 28px;
+}
+
+.hiw-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.hiw-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.hiw-badge {
+    width: 100px;
+    padding: 12px 10px;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    text-align: center;
+    letter-spacing: 0.3px;
+}
+
+.hiw-badge--cat { background: var(--purple); }
+.hiw-badge--hab { background: var(--purple-dark); }
+.hiw-badge--sub { background: var(--teal); }
+
+.hiw-label {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 600;
+    background: var(--card);
+    padding: 6px 12px;
+    border-radius: 8px;
+}
+
+.hiw-arrow {
+    font-size: 22px;
+    color: var(--muted);
+    font-weight: 700;
+}
+
+.landing-footer {
+    text-align: center;
+    padding: 24px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+@media (max-width: 600px) {
+    .hero h1 {
+        font-size: 28px;
+    }
+}

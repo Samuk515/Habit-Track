@@ -17,13 +17,13 @@ CREATE TABLE CATEGORY (
   FOREIGN KEY (user_id) REFERENCES USER(user_id) ON DELETE CASCADE
 );
 
--- HABIT table (MISSING - ADD THIS)
+-- HABIT table
 CREATE TABLE HABIT (
   habit_id INT AUTO_INCREMENT PRIMARY KEY,
   category_id INT NOT NULL,
   habit_name VARCHAR(100) NOT NULL,
   habit_nature ENUM('good', 'bad') NOT NULL DEFAULT 'good',
-  measurement_type ENUM('boolean', 'count', 'duration') NOT NULL DEFAULT 'boolean',
+  measurement_type ENUM('boolean', 'count', 'duration', 'weight', 'distance', 'rating', 'percentage', 'steps', 'custom', 'money', 'time_of_day', 'score', 'volume', 'partial') NOT NULL DEFAULT 'boolean',
   target_value INT NULL,
   target_type ENUM('daily', 'twice a week', 'weekly') NOT NULL DEFAULT 'daily',
   description TEXT NULL,
@@ -43,6 +43,7 @@ CREATE TABLE HABIT_LOG (
   notes VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (habit_id) REFERENCES HABIT(habit_id) ON DELETE CASCADE,
+  FOREIGN KEY (subhabit_id) REFERENCES SUBTASK(subtask_id) ON DELETE SET NULL,
   UNIQUE KEY unique_habit_per_day (habit_id, log_date)
 );
 
@@ -75,6 +76,8 @@ CREATE TABLE Bad_Habit_Progress (
   notes VARCHAR(255),
   FOREIGN KEY (log_id) REFERENCES HABIT_LOG(log_id) ON DELETE CASCADE
 );
+
+-- REMINDER table (references SUBTASK table)
 CREATE TABLE IF NOT EXISTS REMINDER (
     reminder_id INT AUTO_INCREMENT PRIMARY KEY,
     subtask_id INT NOT NULL,
@@ -83,6 +86,8 @@ CREATE TABLE IF NOT EXISTS REMINDER (
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     FOREIGN KEY (subtask_id) REFERENCES SUBTASK(subtask_id) ON DELETE CASCADE
 );
+
+-- CALENDAR_EVENT table (references SUBTASK and HABIT_LOG tables)
 CREATE TABLE IF NOT EXISTS CALENDAR_EVENT (
     event_id INT AUTO_INCREMENT PRIMARY KEY,
     subtask_id INT NOT NULL,
@@ -90,5 +95,6 @@ CREATE TABLE IF NOT EXISTS CALENDAR_EVENT (
     event_date DATE NOT NULL,
     event_type VARCHAR(50) NOT NULL,
     ref_id INT NULL,
-    FOREIGN KEY (subtask_id) REFERENCES SUBTASK(subtask_id) ON DELETE CASCADE
+    FOREIGN KEY (subtask_id) REFERENCES SUBTASK(subtask_id) ON DELETE CASCADE,
+    FOREIGN KEY (ref_id) REFERENCES HABIT_LOG(log_id) ON DELETE CASCADE
 );

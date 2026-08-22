@@ -80,6 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
+            calculateAndSaveStreak($conn, $habitId);
+
             redirect('bad-habit-progress.php?habit_id=' . $habitId);
         }
     }
@@ -123,6 +125,7 @@ mysqli_stmt_close($progressStmt);
 <html>
 <head>
   <title>Progress — Habit Track</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="bad-habit-progress.css?v=20260801-2">
 </head>
 <body>
@@ -169,7 +172,7 @@ mysqli_stmt_close($progressStmt);
               <div>
                 <div class="progress-date"><?php echo htmlspecialchars($p['log_date']); ?></div>
                 <div class="progress-value">
-                  <?php echo $p['value'] !== null ? htmlspecialchars($p['value']) : 'Occurred'; ?>
+                  <?php echo $p['value'] !== null ? htmlspecialchars((string) $p['value']) : 'Occurred'; ?>
                 </div>
                 <?php if ($p['notes']): ?>
                   <div class="progress-notes"><?php echo htmlspecialchars($p['notes']); ?></div>

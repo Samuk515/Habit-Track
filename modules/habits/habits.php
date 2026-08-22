@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $habitName = trim($_POST['habit_name'] ?? '');
         $categoryId = $_POST['category_id'] ?? '';
         $habitNature = $_POST['habit_nature'] ?? '';
-        $measurementType = $_POST['measurement_type'] ?? '';
+        $measurementType = trim((string) ($_POST['measurement_type'] ?? ''));
         $targetValueRaw = trim($_POST['target_value'] ?? '');
         $targetType = $_POST['target_type'] ?? '';
         $description = trim($_POST['description'] ?? '');
@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (!in_array($measurementType, MEASUREMENT_TYPES, true)) {
-            $errors[] = 'Please select a valid measurement type.';
+          $errors[] = 'Please select a valid measurement type.' . ($measurementType !== '' ? ' (got: ' . htmlspecialchars($measurementType) . ')' : '');
         }
 
         if (!in_array($targetType, ['daily', 'twice a week', 'weekly'], true)) {
@@ -137,9 +137,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $categoryId = (int) $categoryId;
 
                 $stmt = mysqli_prepare($conn, 'INSERT INTO HABIT (category_id, habit_name, habit_nature, measurement_type, target_value, target_type, description) VALUES (?, ?, ?, ?, ?, ?, ?)');
-                mysqli_stmt_bind_param($stmt, 'isssiss', $categoryId, $habitName, $habitNature, $measurementType, $targetValue, $targetType, $description);
-                mysqli_stmt_execute($stmt);
-                mysqli_stmt_close($stmt);
+                if ($stmt === false) {
+                  error_log('HABIT INSERT prepare failed: ' . mysqli_error($conn));
+                } else {
+                  error_log('HABIT INSERT debug - values: ' . var_export([
+                    'categoryId' => $categoryId,
+                    'habitName' => $habitName,
+                    'habitNature' => $habitNature,
+                    'measurementType' => $measurementType,
+                    'targetValue' => $targetValue,
+                    'targetType' => $targetType,
+                    'description' => $description,
+                  ], true));
+                  mysqli_stmt_bind_param($stmt, 'isssiss', $categoryId, $habitName, $habitNature, $measurementType, $targetValue, $targetType, $description);
+                  try {
+                    $execOk = mysqli_stmt_execute($stmt);
+                    if ($execOk === false) {
+                      error_log('HABIT INSERT execute failed: ' . mysqli_stmt_error($stmt));
+                    }
+                  } catch (mysqli_sql_exception $e) {
+                    error_log('HABIT INSERT exception: ' . $e->getMessage());
+                    $errors[] = 'A database error occurred while creating the habit.';
+                  }
+                  mysqli_stmt_close($stmt);
+                }
 
                 header('Location: habits.php?page=' . $page);
                 exit;
@@ -158,12 +179,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $categoryId = (int) $categoryId;
 
                 $stmt = mysqli_prepare($conn, 'UPDATE HABIT
-                    SET habit_name = ?, category_id = ?, habit_nature = ?, measurement_type = ?, target_value = ?, target_type = ?, description = ?
-                    WHERE habit_id = ? AND category_id IN (SELECT category_id FROM CATEGORY WHERE user_id = ?)');
-                mysqli_stmt_bind_param($stmt, 'sissisiii', $habitName, $categoryId, $habitNature, $measurementType, $targetValue, $targetType, $description, $habitId, $userId);
-                mysqli_stmt_execute($stmt);
-                $affected = mysqli_stmt_affected_rows($stmt);
-                mysqli_stmt_close($stmt);
+                  SET habit_name = ?, category_id = ?, habit_nature = ?, measurement_type = ?, target_value = ?, target_type = ?, description = ?
+                  WHERE habit_id = ? AND category_id IN (SELECT category_id FROM CATEGORY WHERE user_id = ?)');
+                if ($stmt === false) {
+                  error_log('HABIT UPDATE prepare failed: ' . mysqli_error($conn));
+                  $affected = 0;
+                } else {
+                  error_log('HABIT UPDATE debug - values: ' . var_export([
+                    'habitName' => $habitName,
+                    'categoryId' => $categoryId,
+                    'habitNature' => $habitNature,
+                    'measurementType' => $measurementType,
+                    'targetValue' => $targetValue,
+                    'targetType' => $targetType,
+                    'description' => $description,
+                    'habitId' => $habitId,
+                    'userId' => $userId,
+                  ], true));
+                  mysqli_stmt_bind_param($stmt, 'sissisiii', $habitName, $categoryId, $habitNature, $measurementType, $targetValue, $targetType, $description, $habitId, $userId);
+                  try {
+                    $execOk = mysqli_stmt_execute($stmt);
+                    if ($execOk === false) {
+                      error_log('HABIT UPDATE execute failed: ' . mysqli_stmt_error($stmt));
+                    }
+                  } catch (mysqli_sql_exception $e) {
+                    error_log('HABIT UPDATE exception: ' . $e->getMessage());
+                    $errors[] = 'A database error occurred while updating the habit.';
+                  }
+                  $affected = mysqli_stmt_affected_rows($stmt);
+                  mysqli_stmt_close($stmt);
+                }
 
                 if ($affected === 0) {
                     $errors[] = 'Habit not found.';
@@ -247,6 +292,14 @@ $measurementLabels = [
     'volume' => 'Volume (ml)',
     'partial' => 'Partial completion',
 ];
+// Shared across the Add form and every Edit form — one place to
+// change the option list rather than duplicating it per form.
+$renderMeasurementOptions = function (string $selected) use ($measurementLabels) {
+  foreach ($measurementLabels as $value => $label) {
+    $sel = $value === $selected ? 'selected' : '';
+    echo "<option value=\"" . htmlspecialchars($value) . "\" $sel>" . htmlspecialchars($label) . "</option>";
+  }
+};
 ?>
 <!DOCTYPE html>
 <html>
@@ -275,16 +328,7 @@ $measurementLabels = [
         <div class="error-box"><?php echo htmlspecialchars($err); ?></div>
       <?php endforeach; ?>
 
-      <?php
-      // Shared across the Add form and every Edit form — one place to
-      // change the option list rather than duplicating it per form.
-      $renderMeasurementOptions = function (string $selected) use ($measurementLabels) {
-          foreach ($measurementLabels as $value => $label) {
-              $sel = $value === $selected ? 'selected' : '';
-              echo "<option value=\"" . htmlspecialchars($value) . "\" $sel>" . htmlspecialchars($label) . "</option>";
-          }
-      };
-      ?>
+      
 
       <?php if (empty($categories)): ?>
         <div class="empty-state">

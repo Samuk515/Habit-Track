@@ -50,24 +50,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_close($logStmt);
 
             if ($todayLog) {
-                $logId = (int) $todayLog['log_id'];
-                $deleteStmt = mysqli_prepare($conn, 'DELETE FROM HABIT_LOG WHERE log_id = ?');
-                mysqli_stmt_bind_param($deleteStmt, 'i', $logId);
-                mysqli_stmt_execute($deleteStmt);
-                mysqli_stmt_close($deleteStmt);
+                $errors[] = 'Already marked as done today.';
             } else {
                 $insertStmt = mysqli_prepare($conn, "INSERT INTO HABIT_LOG (habit_id, log_date, status) VALUES (?, CURDATE(), 'done')");
                 mysqli_stmt_bind_param($insertStmt, 'i', $habitId);
                 mysqli_stmt_execute($insertStmt);
                 mysqli_stmt_close($insertStmt);
+
+                calculateAndSaveStreak($conn, $habitId);
+
+                redirect('dashboard.php');
             }
-
-            calculateAndSaveStreak($conn, $habitId);
-
-            redirect('dashboard.php');
         }
     }
 }
+
+// Recalculate streaks for all of this user's habits on every load
+// so the dashboard never shows stale values after days of inactivity.
+$habitIdsStmt = mysqli_prepare($conn, 'SELECT HABIT.habit_id FROM HABIT
+    INNER JOIN CATEGORY ON HABIT.category_id = CATEGORY.category_id
+    WHERE CATEGORY.user_id = ?');
+mysqli_stmt_bind_param($habitIdsStmt, 'i', $userId);
+mysqli_stmt_execute($habitIdsStmt);
+$habitIdsResult = mysqli_stmt_get_result($habitIdsStmt);
+while ($row = mysqli_fetch_assoc($habitIdsResult)) {
+    calculateAndSaveStreak($conn, (int) $row['habit_id']);
+}
+mysqli_stmt_close($habitIdsStmt);
 
 $stmt = mysqli_prepare($conn, 'SELECT
     HABIT.habit_id, HABIT.habit_name, HABIT.habit_nature,
@@ -91,7 +100,7 @@ mysqli_stmt_close($stmt);
 <head>
   <title>Dashboard — Habit Track</title>
   <link rel="stylesheet" href="/assets/css/style.css">
-  <link rel="stylesheet" href="dashboard.css?v=20260801-2">
+  <link rel="stylesheet" href="dashboard.css?v=20260811-3">
 </head>
 <body>
   <div class="app-layout">
@@ -132,8 +141,8 @@ mysqli_stmt_close($stmt);
               <form method="POST" action="dashboard.php">
                 <input type="hidden" name="action" value="toggle_done">
                 <input type="hidden" name="habit_id" value="<?php echo $h['habit_id']; ?>">
-                <button type="submit" class="btn-primary<?php echo $isDone ? ' btn-done' : ''; ?>">
-                  <?php echo $isDone ? '✓ Done' : 'Mark done'; ?>
+                <button type="submit" class="btn-primary<?php echo $isDone ? ' btn-done' : ''; ?>"<?php echo $isDone ? ' disabled' : ''; ?>>
+                  <?php echo $isDone ? '✓ Done today' : 'Mark done'; ?>
                 </button>
               </form>
               <?php if ($h['habit_nature'] === 'bad'): ?>

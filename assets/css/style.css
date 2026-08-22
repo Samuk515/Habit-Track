@@ -56,16 +56,6 @@ body {
     gap: 10px;
 }
 
-.sidebar .logo-mark {
-    background: var(--purple);
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
 .sidebar .logo-text {
     font-size: 18px;
     font-weight: 700;
