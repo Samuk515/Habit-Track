@@ -7,12 +7,11 @@ require __DIR__ . '/../../includes/db.php';
 
 $errors = [];
 $userId = (int) $_SESSION['user_id'];
-$perPage = 10;
-$page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
-$offset = ($page - 1) * $perPage;
 
-$editCategoryId = filter_var($_GET['edit_category_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
-$editValues = null;
+// Failed-edit state, if a POST update below fails validation — used
+// to reopen the dialog with the attempted values instead of losing them.
+$failedEditCategoryId = null;
+$failedEditValues = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
@@ -36,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_stmt_execute($stmt);
                 mysqli_stmt_close($stmt);
 
-                header('Location: categories.php?page=' . $page);
+                header('Location: categories.php');
                 exit;
             }
         }
@@ -59,14 +58,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($affected === 0) {
                     $errors[] = 'Category not found.';
                 } else {
-                    header('Location: categories.php?page=' . $page);
+                    header('Location: categories.php');
                     exit;
                 }
             }
 
             if (!empty($errors)) {
-                $editCategoryId = $categoryId ?? null;
-                $editValues = ['category_name' => $name, 'description' => $description];
+                $failedEditCategoryId = $categoryId ?? null;
+                $failedEditValues = [
+                    'id' => $failedEditCategoryId,
+                    'name' => $name,
+                    'description' => $description,
+                ];
             }
         }
     }
@@ -89,13 +92,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_close($ownStmt);
 
             if ($owns) {
-                // Deleting a category cascades through everything
-                // beneath it: habits, their subtasks, logs, streaks,
-                // bad-habit progress, and reminders — 6 tables. This
-                // runs as one transaction: either the whole cascade
-                // commits, or none of it does. Without this, a
-                // mid-cascade failure would leave orphaned rows (e.g.
-                // a SUBTASK pointing at a habit_id that no longer exists).
                 mysqli_begin_transaction($conn);
                 $cascadeOk = true;
 
@@ -148,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($cascadeOk) {
                     mysqli_commit($conn);
-                    header('Location: categories.php?page=' . $page);
+                    header('Location: categories.php');
                     exit;
                 }
 
@@ -159,42 +155,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$countStmt = mysqli_prepare($conn, 'SELECT COUNT(*) FROM CATEGORY WHERE user_id = ?');
-mysqli_stmt_bind_param($countStmt, 'i', $userId);
-mysqli_stmt_execute($countStmt);
-mysqli_stmt_bind_result($countStmt, $totalCategories);
-mysqli_stmt_fetch($countStmt);
-mysqli_stmt_close($countStmt);
-$totalPages = (int) ceil($totalCategories / $perPage);
-
-if ($totalPages > 0 && $page > $totalPages) {
-    $page = $totalPages;
-    $offset = ($page - 1) * $perPage;
-}
-
-// LEFT JOIN + COUNT gives a live, always-accurate habit count per
-// category — replaces the old hand-typed "Gym, Running, walking"
-// description text, which had no connection to the real HABIT rows
-// and would silently go stale the moment a habit was renamed or added.
+// DataTables handles pagination client-side now — fetch everything,
+// no LIMIT/OFFSET or page math needed server-side anymore.
 $catStmt = mysqli_prepare($conn, 'SELECT CATEGORY.*, COUNT(HABIT.habit_id) AS habit_count
     FROM CATEGORY
     LEFT JOIN HABIT ON HABIT.category_id = CATEGORY.category_id
     WHERE CATEGORY.user_id = ?
     GROUP BY CATEGORY.category_id
-    ORDER BY CATEGORY.created_at DESC
-    LIMIT ? OFFSET ?');
-mysqli_stmt_bind_param($catStmt, 'iii', $userId, $perPage, $offset);
+    ORDER BY CATEGORY.created_at DESC');
+mysqli_stmt_bind_param($catStmt, 'i', $userId);
 mysqli_stmt_execute($catStmt);
 $catResult = mysqli_stmt_get_result($catStmt);
 $categories = mysqli_fetch_all($catResult, MYSQLI_ASSOC);
 mysqli_stmt_close($catStmt);
+
+// Every category's data, for the edit dialog to look up client-side.
+$categoriesForJs = array_map(function ($c) {
+    return [
+        'id' => (int) $c['category_id'],
+        'name' => $c['category_name'],
+        'description' => $c['description'],
+    ];
+}, $categories);
 ?>
 <!DOCTYPE html>
 <html>
 <head>
   <title>Categories — Habit Track</title>
   <link rel="stylesheet" href="/assets/css/style.css">
-  <link rel="stylesheet" href="categories.css?v=20260801-3">
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <link href="https://cdn.datatables.net/v/dt/dt-3.0.2/datatables.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="categories.css?v=20260801-4">
 </head>
 <body>
   <div class="app-layout">
@@ -217,7 +208,7 @@ mysqli_stmt_close($catStmt);
       <?php endforeach; ?>
 
       <div class="auth-card category-form-card">
-        <form method="POST" action="categories.php?page=<?php echo $page; ?>">
+        <form method="POST" action="categories.php">
           <input type="hidden" name="action" value="add">
           <div class="field"><input type="text" name="category_name" placeholder="Category name" required></div>
           <div class="field"><input type="text" name="description" placeholder="Description (optional)"></div>
@@ -228,7 +219,7 @@ mysqli_stmt_close($catStmt);
       <?php if (empty($categories)): ?>
         <div class="empty-state"><p>No categories yet.</p></div>
       <?php else: ?>
-        <table class="data-table">
+        <table id="categories-table" class="data-table">
           <thead>
             <tr>
               <th>Category</th>
@@ -239,64 +230,53 @@ mysqli_stmt_close($catStmt);
           </thead>
           <tbody>
             <?php foreach ($categories as $cat): ?>
-              <?php $isEditing = ($editCategoryId !== null && (int) $cat['category_id'] === (int) $editCategoryId); ?>
-
-              <?php if ($isEditing): ?>
-                <?php $ev = $editValues ?? $cat; ?>
-                <tr class="edit-row" id="category-<?php echo $cat['category_id']; ?>">
-                  <td colspan="4">
-                    <form method="POST" action="categories.php?page=<?php echo $page; ?>">
-                      <input type="hidden" name="action" value="update">
-                      <input type="hidden" name="category_id" value="<?php echo $cat['category_id']; ?>">
-
-                      <div class="field"><input type="text" name="category_name" value="<?php echo htmlspecialchars((string) $ev['category_name']); ?>" required></div>
-                      <div class="field"><input type="text" name="description" value="<?php echo htmlspecialchars((string) ($ev['description'] ?? '')); ?>" placeholder="Description (optional)"></div>
-
-                      <div class="edit-form-actions">
-                        <button type="submit" class="btn-primary">Save changes</button>
-                        <a href="categories.php?page=<?php echo $page; ?>" class="btn-cancel">Cancel</a>
-                      </div>
-                    </form>
-                  </td>
-                </tr>
-
-              <?php else: ?>
-                <?php
-                  $habitCount = (int) $cat['habit_count'];
-                  $confirmMsg = 'Delete "' . $cat['category_name'] . '"? This will also permanently delete '
-                      . $habitCount . ' habit(s) and everything under them (subtasks, logs, reminders). This cannot be undone.';
-                ?>
-                <tr id="category-<?php echo $cat['category_id']; ?>">
-                  <td><?php echo htmlspecialchars($cat['category_name']); ?></td>
-                  <td><?php echo $cat['description'] ? htmlspecialchars($cat['description']) : '—'; ?></td>
-                  <td><span class="badge-optional"><?php echo $habitCount; ?> habit<?php echo $habitCount === 1 ? '' : 's'; ?></span></td>
-                  <td class="actions-cell">
-                    <a href="categories.php?page=<?php echo $page; ?>&edit_category_id=<?php echo $cat['category_id']; ?>#category-<?php echo $cat['category_id']; ?>" class="btn-edit">Edit</a>
-                    <form method="POST" action="categories.php?page=<?php echo $page; ?>">
-                      <input type="hidden" name="action" value="delete">
-                      <input type="hidden" name="category_id" value="<?php echo $cat['category_id']; ?>">
-                      <button type="submit" class="btn-delete" onclick="return confirm(<?php echo htmlspecialchars(json_encode($confirmMsg)); ?>)">Delete</button>
-                    </form>
-                  </td>
-                </tr>
-              <?php endif; ?>
+              <?php
+                $habitCount = (int) $cat['habit_count'];
+                $confirmMsg = 'Delete "' . $cat['category_name'] . '"? This will also permanently delete '
+                    . $habitCount . ' habit(s) and everything under them (subtasks, logs, reminders). This cannot be undone.';
+              ?>
+              <tr>
+                <td><?php echo htmlspecialchars($cat['category_name']); ?></td>
+                <td><?php echo $cat['description'] ? htmlspecialchars($cat['description']) : '—'; ?></td>
+                <td><span class="badge-optional"><?php echo $habitCount; ?> habit<?php echo $habitCount === 1 ? '' : 's'; ?></span></td>
+                <td class="actions-cell">
+                  <button type="button" class="btn-edit" onclick="openEditCategoryDialog(<?php echo (int) $cat['category_id']; ?>)">Edit</button>
+                  <form method="POST" action="categories.php" style="display:inline;">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="category_id" value="<?php echo $cat['category_id']; ?>">
+                    <button type="submit" class="btn-delete" onclick="return confirm(<?php echo htmlspecialchars(json_encode($confirmMsg)); ?>)">Delete</button>
+                  </form>
+                </td>
+              </tr>
             <?php endforeach; ?>
           </tbody>
         </table>
-
-        <?php if ($totalPages > 1): ?>
-          <div class="list-pagination">
-            <?php if ($page > 1): ?>
-              <a class="pagination-link" href="categories.php?page=<?php echo $page - 1; ?>">Previous</a>
-            <?php endif; ?>
-            <span class="pagination-status">Page <?php echo $page; ?> of <?php echo $totalPages; ?></span>
-            <?php if ($page < $totalPages): ?>
-              <a class="pagination-link" href="categories.php?page=<?php echo $page + 1; ?>">Next</a>
-            <?php endif; ?>
-          </div>
-        <?php endif; ?>
       <?php endif; ?>
+
+      <!-- Edit dialog — lives outside the table entirely so DataTables
+           never has to reason about an irregular row. -->
+      <div id="edit-category-dialog" title="Edit Category" style="display:none;">
+        <form method="POST" action="categories.php" id="edit-category-form">
+          <input type="hidden" name="action" value="update">
+          <input type="hidden" name="category_id" id="edit-category-id">
+
+          <div class="field"><input type="text" name="category_name" id="edit-category-name" required></div>
+          <div class="field"><input type="text" name="description" id="edit-category-description" placeholder="Description (optional)"></div>
+
+          <button type="submit" class="btn-primary">Save changes</button>
+        </form>
+      </div>
+
     </div>
   </div>
+
+  <script>
+    window.CATEGORIES_DATA = <?php echo json_encode($categoriesForJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.FAILED_EDIT = <?php echo $failedEditValues ? json_encode($failedEditValues, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) : 'null'; ?>;
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+  <script src="https://cdn.datatables.net/v/dt/dt-3.0.2/datatables.min.js"></script>
+  <script src="categories-datatable.js"></script>
 </body>
 </html>
