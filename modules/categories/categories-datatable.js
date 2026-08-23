@@ -1,13 +1,11 @@
 $(document).ready(function () {
     $('#categories-table').DataTable({
         pageLength: 5,
-        pagingType: 'simple_numbers', // Previous / 1 2 3 / Next — matches Habits' pagination
+        pagingType: 'simple_numbers',
         searching: false,
         lengthChange: false,
         info: false,
-        columnDefs: [
-            { orderable: false, targets: -1 } // Actions column shouldn't be sortable
-        ]
+        ordering: false // no sort arrows — plain pagination only, as originally asked for
     });
 
     $('#edit-category-dialog').dialog({
