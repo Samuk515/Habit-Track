@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_stmt_execute($stmt);
                 mysqli_stmt_close($stmt);
 
-                header('Location: categories.php');
+                header('Location: categories.php?success=add');
                 exit;
             }
         }
@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($affected === 0) {
                     $errors[] = 'Category not found.';
                 } else {
-                    header('Location: categories.php');
+                    header('Location: categories.php?success=update');
                     exit;
                 }
             }
@@ -144,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($cascadeOk) {
                     mysqli_commit($conn);
-                    header('Location: categories.php');
+                    header('Location: categories.php?success=delete');
                     exit;
                 }
 
@@ -188,6 +188,7 @@ $categoriesForJs = array_map(function ($c) {
   <link rel="stylesheet" href="categories.css?v=20260801-4">
 </head>
 <body>
+  <script>window.SERVER_ERRORS = <?php echo json_encode($errors, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
@@ -244,7 +245,7 @@ $categoriesForJs = array_map(function ($c) {
                   <form method="POST" action="categories.php" style="display:inline;">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="category_id" value="<?php echo $cat['category_id']; ?>">
-                    <button type="submit" class="btn-delete" onclick="return confirm(<?php echo htmlspecialchars(json_encode($confirmMsg)); ?>)">Delete</button>
+                    <button type="button" class="btn-delete" data-confirm-message="<?php echo htmlspecialchars($confirmMsg); ?>">Delete</button>
                   </form>
                 </td>
               </tr>
@@ -277,6 +278,9 @@ $categoriesForJs = array_map(function ($c) {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
   <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
   <script src="https://cdn.datatables.net/v/dt/dt-3.0.2/datatables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/confirm-delete.js"></script>
   <script src="categories-datatable.js"></script>
 </body>
 </html>

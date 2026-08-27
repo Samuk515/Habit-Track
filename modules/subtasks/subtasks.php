@@ -14,13 +14,8 @@ if (filter_var($habitId, FILTER_VALIDATE_INT) === false) {
 }
 $habitId = (int) $habitId;
 
-$perPage = 10;
-$page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
-$offset = ($page - 1) * $perPage;
-
-$editSubtaskId = filter_var($_GET['edit_subtask_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
-$editValues = null;
-$logModeSubtaskId = filter_var($_GET['log_subtask_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
+$failedEditValues = null;
+$failedLogValues = null;
 
 // Ownership verified ONCE, here, at the top of the file — every
 // query below trusts this $habitId without re-checking.
@@ -48,7 +43,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($subtaskName === '') {
             $errors[] = 'Subtask name is required.';
         }
-
         if ($description === '') {
             $description = null;
         }
@@ -68,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_stmt_execute($insertStmt);
                 mysqli_stmt_close($insertStmt);
 
-                header('Location: subtasks.php?habit_id=' . $habitId . '&page=' . $page);
+                header('Location: subtasks.php?habit_id=' . $habitId . '&success=add');
                 exit;
             }
         }
@@ -91,15 +85,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($affected === 0) {
                     $errors[] = 'Subtask not found.';
                 } else {
-                    header('Location: subtasks.php?habit_id=' . $habitId . '&page=' . $page);
+                    header('Location: subtasks.php?habit_id=' . $habitId . '&success=update');
                     exit;
                 }
             }
 
             if (!empty($errors)) {
-                $editSubtaskId = $subtaskId ?? null;
-                $editValues = [
-                    'subtask_name' => $subtaskName,
+                $failedEditValues = [
+                    'id' => $subtaskId ?? null,
+                    'name' => $subtaskName,
                     'description' => $description,
                     'is_optional' => $isOptional,
                 ];
@@ -109,7 +103,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'delete') {
         $subtaskId = $_POST['subtask_id'] ?? '';
-
         if (filter_var($subtaskId, FILTER_VALIDATE_INT) !== false) {
             $subtaskId = (int) $subtaskId;
 
@@ -118,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($deleteStmt);
             mysqli_stmt_close($deleteStmt);
 
-            header('Location: subtasks.php?habit_id=' . $habitId . '&page=' . $page);
+            header('Location: subtasks.php?habit_id=' . $habitId . '&success=delete');
             exit;
         }
     }
@@ -131,8 +124,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $logSubtaskId = (int) $logSubtaskId;
 
-            // Confirm this subtask actually belongs to the
-            // verified-owned habit before logging against it.
             $subCheckStmt = mysqli_prepare($conn, 'SELECT subtask_id, subtask_name FROM SUBTASK WHERE subtask_id = ? AND habit_id = ?');
             mysqli_stmt_bind_param($subCheckStmt, 'ii', $logSubtaskId, $habitId);
             mysqli_stmt_execute($subCheckStmt);
@@ -159,10 +150,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 if (empty($errors)) {
-                    // UNIQUE(habit_id, log_date) on HABIT_LOG means at
-                    // most one row per habit per day — so this is an
-                    // upsert. Logging a different subtask today
-                    // overwrites today's row rather than adding a new one.
                     $existingStmt = mysqli_prepare($conn, 'SELECT log_id FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE()');
                     mysqli_stmt_bind_param($existingStmt, 'i', $habitId);
                     mysqli_stmt_execute($existingStmt);
@@ -184,13 +171,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $logId = (int) mysqli_insert_id($conn);
                     }
 
-                    // Auto-populate the calendar from this subtask
-                    // activity — this is the ONLY place CALENDAR_EVENT
-                    // rows get created anywhere in the app, per the
-                    // "no manual event creation" requirement. Clear any
-                    // previous event tied to this exact log row first,
-                    // so re-logging the same day updates the calendar
-                    // entry instead of duplicating it.
                     $clearEventStmt = mysqli_prepare($conn, "DELETE FROM CALENDAR_EVENT WHERE ref_id = ? AND event_type = 'subtask_log'");
                     mysqli_stmt_bind_param($clearEventStmt, 'i', $logId);
                     mysqli_stmt_execute($clearEventStmt);
@@ -206,17 +186,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     mysqli_stmt_execute($insertEventStmt);
                     mysqli_stmt_close($insertEventStmt);
 
-                    // Any write to HABIT_LOG affects the habit's streak,
-                    // regardless of which page/action produced the row.
                     calculateAndSaveStreak($conn, $habitId);
 
-                    header('Location: subtasks.php?habit_id=' . $habitId . '&page=' . $page);
+                    header('Location: subtasks.php?habit_id=' . $habitId . '&success=log');
                     exit;
                 }
             }
 
             if (!empty($errors)) {
-                $logModeSubtaskId = $logSubtaskId;
+                $failedLogValues = [
+                    'id' => $logSubtaskId,
+                    'value' => $_POST['log_value'] ?? '',
+                    'unit' => $_POST['log_unit'] ?? '',
+                ];
             }
         }
     }
@@ -227,9 +209,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (filter_var($logSubtaskId, FILTER_VALIDATE_INT) !== false) {
             $logSubtaskId = (int) $logSubtaskId;
 
-            // Find the log_id first, so its calendar event can be
-            // cleaned up before the HABIT_LOG row itself is gone —
-            // once deleted, there's nothing left to look ref_id up by.
             $findStmt = mysqli_prepare($conn, 'SELECT log_id FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE() AND subhabit_id = ?');
             mysqli_stmt_bind_param($findStmt, 'ii', $habitId, $logSubtaskId);
             mysqli_stmt_execute($findStmt);
@@ -245,9 +224,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_stmt_close($clearEventStmt);
             }
 
-            // Only clears if today's log actually belongs to THIS
-            // subtask — prevents wiping a different subtask's log via
-            // a stale or tampered request.
             $stmt = mysqli_prepare($conn, 'DELETE FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE() AND subhabit_id = ?');
             mysqli_stmt_bind_param($stmt, 'ii', $habitId, $logSubtaskId);
             mysqli_stmt_execute($stmt);
@@ -255,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             calculateAndSaveStreak($conn, $habitId);
 
-            header('Location: subtasks.php?habit_id=' . $habitId . '&page=' . $page);
+            header('Location: subtasks.php?habit_id=' . $habitId . '&success=clear_log');
             exit;
         }
     }
@@ -289,9 +265,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $neighborId = (int) $neighbor['subtask_id'];
                     $neighborOrder = (int) $neighbor['order_no'];
 
-                    // Three-step swap via a temporary sentinel value —
-                    // avoids a transient duplicate order_no mid-swap if
-                    // (habit_id, order_no) is ever made UNIQUE later.
                     $tempStmt = mysqli_prepare($conn, 'UPDATE SUBTASK SET order_no = -1 WHERE subtask_id = ? AND habit_id = ?');
                     mysqli_stmt_bind_param($tempStmt, 'ii', $subtaskId, $habitId);
                     mysqli_stmt_execute($tempStmt);
@@ -309,16 +282,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            header('Location: subtasks.php?habit_id=' . $habitId . '&page=' . $page);
+            header('Location: subtasks.php?habit_id=' . $habitId);
             exit;
         }
     }
 }
 
-// Today's single log row for this habit (if any) — UNIQUE(habit_id,
-// log_date) guarantees there's at most one, so a plain fetch is safe.
-// LEFT JOIN pulls the logged subtask's name too, for the "logged a
-// different subtask today" note.
 $todayLogStmt = mysqli_prepare($conn, 'SELECT HABIT_LOG.subhabit_id, HABIT_LOG.value, HABIT_LOG.unit, SUBTASK.subtask_name AS logged_subtask_name
     FROM HABIT_LOG
     LEFT JOIN SUBTASK ON HABIT_LOG.subhabit_id = SUBTASK.subtask_id
@@ -329,34 +298,38 @@ $todayLogResult = mysqli_stmt_get_result($todayLogStmt);
 $todayLog = mysqli_fetch_assoc($todayLogResult);
 mysqli_stmt_close($todayLogStmt);
 
-$countStmt = mysqli_prepare($conn, 'SELECT COUNT(*) FROM SUBTASK WHERE habit_id = ?');
-mysqli_stmt_bind_param($countStmt, 'i', $habitId);
-mysqli_stmt_execute($countStmt);
-mysqli_stmt_bind_result($countStmt, $totalSubtasks);
-mysqli_stmt_fetch($countStmt);
-mysqli_stmt_close($countStmt);
-$totalPages = (int) ceil($totalSubtasks / $perPage);
-
-if ($totalPages > 0 && $page > $totalPages) {
-    $page = $totalPages;
-    $offset = ($page - 1) * $perPage;
-}
-
-$subtaskStmt = mysqli_prepare($conn, 'SELECT * FROM SUBTASK WHERE habit_id = ? ORDER BY order_no ASC LIMIT ? OFFSET ?');
-mysqli_stmt_bind_param($subtaskStmt, 'iii', $habitId, $perPage, $offset);
+// DataTables handles pagination client-side now — fetch everything.
+$subtaskStmt = mysqli_prepare($conn, 'SELECT * FROM SUBTASK WHERE habit_id = ? ORDER BY order_no ASC');
+mysqli_stmt_bind_param($subtaskStmt, 'i', $habitId);
 mysqli_stmt_execute($subtaskStmt);
 $subtaskResult = mysqli_stmt_get_result($subtaskStmt);
 $subtasks = mysqli_fetch_all($subtaskResult, MYSQLI_ASSOC);
 mysqli_stmt_close($subtaskStmt);
+
+$subtasksForJs = array_map(function ($s) use ($todayLog) {
+    $isLoggedToday = $todayLog && (int) $todayLog['subhabit_id'] === (int) $s['subtask_id'];
+    return [
+        'id' => (int) $s['subtask_id'],
+        'name' => $s['subtask_name'],
+        'description' => $s['description'],
+        'is_optional' => (int) $s['is_optional'],
+        'logged_today' => $isLoggedToday,
+        'today_value' => $isLoggedToday && $todayLog['value'] !== null ? (int) $todayLog['value'] : null,
+        'today_unit' => $isLoggedToday ? $todayLog['unit'] : null,
+    ];
+}, $subtasks);
 ?>
 <!DOCTYPE html>
 <html>
 <head>
   <title>Subtasks — Habit Track</title>
   <link rel="stylesheet" href="/assets/css/style.css">
-  <link rel="stylesheet" href="subtasks.css?v=20260801-5">
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <link href="https://cdn.datatables.net/v/dt/dt-3.0.2/datatables.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="subtasks.css?v=20260801-6">
 </head>
 <body>
+  <script>window.SERVER_ERRORS = <?php echo json_encode($errors, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
@@ -380,7 +353,7 @@ mysqli_stmt_close($subtaskStmt);
       <?php endforeach; ?>
 
       <div class="auth-card subtask-form-card">
-        <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page; ?>">
+        <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>">
           <input type="hidden" name="action" value="add">
           <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
 
@@ -398,7 +371,7 @@ mysqli_stmt_close($subtaskStmt);
       <?php if (empty($subtasks)): ?>
         <div class="empty-state"><p>No subtasks yet.</p></div>
       <?php else: ?>
-        <table class="data-table">
+        <table id="subtasks-table" class="data-table">
           <thead>
             <tr>
               <th>Subtask</th>
@@ -410,120 +383,100 @@ mysqli_stmt_close($subtaskStmt);
           </thead>
           <tbody>
             <?php foreach ($subtasks as $s): ?>
-              <?php
-                $isEditing = ($editSubtaskId !== null && (int) $s['subtask_id'] === (int) $editSubtaskId);
-                $isLoggingRow = (!$isEditing && $logModeSubtaskId !== null && (int) $s['subtask_id'] === (int) $logModeSubtaskId);
-                $isLoggedToday = ($todayLog && (int) $todayLog['subhabit_id'] === (int) $s['subtask_id']);
-              ?>
-
-              <?php if ($isEditing): ?>
-                <?php $ev = $editValues ?? $s; ?>
-                <tr class="edit-row" id="subtask-<?php echo $s['subtask_id']; ?>">
-                  <td colspan="5">
-                    <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page; ?>">
-                      <input type="hidden" name="action" value="update">
-                      <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
-                      <input type="hidden" name="subtask_id" value="<?php echo $s['subtask_id']; ?>">
-
-                      <div class="field"><input type="text" name="subtask_name" value="<?php echo htmlspecialchars((string) $ev['subtask_name']); ?>" required></div>
-                      <div class="field"><input type="text" name="description" value="<?php echo htmlspecialchars((string) ($ev['description'] ?? '')); ?>" placeholder="Description (optional)"></div>
-                      <div class="field field-checkbox">
-                        <input type="checkbox" name="is_optional" id="edit-is_optional-<?php echo $s['subtask_id']; ?>" class="checkbox-input" <?php echo $ev['is_optional'] ? 'checked' : ''; ?>>
-                        <label for="edit-is_optional-<?php echo $s['subtask_id']; ?>" class="checkbox-label">This subtask is optional</label>
-                      </div>
-
-                      <div class="edit-form-actions">
-                        <button type="submit" class="btn-primary">Save changes</button>
-                        <a href="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page; ?>" class="btn-cancel">Cancel</a>
-                      </div>
-                    </form>
-                  </td>
-                </tr>
-
-              <?php elseif ($isLoggingRow): ?>
-                <tr class="edit-row" id="subtask-<?php echo $s['subtask_id']; ?>">
-                  <td colspan="5">
-                    <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page; ?>">
-                      <input type="hidden" name="action" value="log_completion">
-                      <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
-                      <input type="hidden" name="subtask_id" value="<?php echo $s['subtask_id']; ?>">
-
-                      <div class="field"><input type="number" name="log_value" placeholder="Value (optional)" value="<?php echo $isLoggedToday && $todayLog['value'] !== null ? (int) $todayLog['value'] : ''; ?>"></div>
-                      <div class="field"><input type="text" name="log_unit" placeholder="Unit (e.g. kg, minutes, reps)" value="<?php echo $isLoggedToday ? htmlspecialchars((string) ($todayLog['unit'] ?? '')) : ''; ?>"></div>
-
-                      <div class="edit-form-actions">
-                        <button type="submit" class="btn-primary">Save log</button>
-                        <a href="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page; ?>" class="btn-cancel">Cancel</a>
-                      </div>
-                    </form>
-                    <?php if ($isLoggedToday): ?>
-                    <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page; ?>" class="clear-log-form">
-                      <input type="hidden" name="action" value="clear_log">
-                      <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
-                      <input type="hidden" name="subtask_id" value="<?php echo $s['subtask_id']; ?>">
-                      <button type="submit" class="btn-delete">Clear today's log</button>
-                    </form>
-                    <?php endif; ?>
-                  </td>
-                </tr>
-
-              <?php else: ?>
-                <tr id="subtask-<?php echo $s['subtask_id']; ?>">
-                  <td><?php echo htmlspecialchars($s['subtask_name']); ?></td>
-                  <td><?php echo $s['description'] ? htmlspecialchars($s['description']) : '—'; ?></td>
-                  <td><?php echo $s['is_optional'] ? '<span class="badge-optional">Optional</span>' : '—'; ?></td>
-                  <td>
-                    <?php if ($isLoggedToday): ?>
-                      <span class="badge-logged">✓<?php echo $todayLog['value'] !== null ? ' ' . htmlspecialchars((string) (int) $todayLog['value']) : ''; ?><?php echo $todayLog['unit'] ? ' ' . htmlspecialchars($todayLog['unit']) : ''; ?></span>
-                    <?php elseif ($todayLog): ?>
-                      <span class="today-other-note">Today: <?php echo htmlspecialchars((string) $todayLog['logged_subtask_name']); ?></span>
-                    <?php else: ?>
-                      —
-                    <?php endif; ?>
-                  </td>
-                  <td class="actions-cell">
-                    <a href="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page; ?>&log_subtask_id=<?php echo $s['subtask_id']; ?>#subtask-<?php echo $s['subtask_id']; ?>" class="btn-log">Log</a>
-                    <a href="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page; ?>&edit_subtask_id=<?php echo $s['subtask_id']; ?>#subtask-<?php echo $s['subtask_id']; ?>" class="btn-edit">Edit</a>
-                    <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page; ?>" class="reorder-form">
-                      <input type="hidden" name="action" value="move_up">
-                      <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
-                      <input type="hidden" name="subtask_id" value="<?php echo $s['subtask_id']; ?>">
-                      <button type="submit" class="btn-reorder" aria-label="Move up">▲</button>
-                    </form>
-                    <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page; ?>" class="reorder-form">
-                      <input type="hidden" name="action" value="move_down">
-                      <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
-                      <input type="hidden" name="subtask_id" value="<?php echo $s['subtask_id']; ?>">
-                      <button type="submit" class="btn-reorder" aria-label="Move down">▼</button>
-                    </form>
-                    <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page; ?>">
-                      <input type="hidden" name="action" value="delete">
-                      <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
-                      <input type="hidden" name="subtask_id" value="<?php echo $s['subtask_id']; ?>">
-                      <button type="submit" class="btn-delete">Delete</button>
-                    </form>
-                  </td>
-                </tr>
-              <?php endif; ?>
+              <?php $isLoggedToday = ($todayLog && (int) $todayLog['subhabit_id'] === (int) $s['subtask_id']); ?>
+              <tr>
+                <td><?php echo htmlspecialchars($s['subtask_name']); ?></td>
+                <td><?php echo $s['description'] ? htmlspecialchars($s['description']) : '—'; ?></td>
+                <td><?php echo $s['is_optional'] ? '<span class="badge-optional">Optional</span>' : '—'; ?></td>
+                <td>
+                  <?php if ($isLoggedToday): ?>
+                    <span class="badge-logged">✓<?php echo $todayLog['value'] !== null ? ' ' . htmlspecialchars((string) (int) $todayLog['value']) : ''; ?><?php echo $todayLog['unit'] ? ' ' . htmlspecialchars($todayLog['unit']) : ''; ?></span>
+                  <?php elseif ($todayLog): ?>
+                    <span class="today-other-note">Today: <?php echo htmlspecialchars((string) $todayLog['logged_subtask_name']); ?></span>
+                  <?php else: ?>
+                    —
+                  <?php endif; ?>
+                </td>
+                <td class="actions-cell">
+                  <button type="button" class="btn-log" onclick="openLogSubtaskDialog(<?php echo (int) $s['subtask_id']; ?>)">Log</button>
+                  <button type="button" class="btn-edit" onclick="openEditSubtaskDialog(<?php echo (int) $s['subtask_id']; ?>)">Edit</button>
+                  <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>" class="reorder-form">
+                    <input type="hidden" name="action" value="move_up">
+                    <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
+                    <input type="hidden" name="subtask_id" value="<?php echo $s['subtask_id']; ?>">
+                    <button type="submit" class="btn-reorder" aria-label="Move up">▲</button>
+                  </form>
+                  <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>" class="reorder-form">
+                    <input type="hidden" name="action" value="move_down">
+                    <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
+                    <input type="hidden" name="subtask_id" value="<?php echo $s['subtask_id']; ?>">
+                    <button type="submit" class="btn-reorder" aria-label="Move down">▼</button>
+                  </form>
+                  <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>" style="display:inline;">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
+                    <input type="hidden" name="subtask_id" value="<?php echo $s['subtask_id']; ?>">
+                    <button type="button" class="btn-delete" data-confirm-message="<?php echo htmlspecialchars('Delete "' . $s['subtask_name'] . '"? Any reminders tied to it will also be removed. This cannot be undone.'); ?>">Delete</button>
+                  </form>
+                </td>
+              </tr>
             <?php endforeach; ?>
           </tbody>
         </table>
-
-        <?php if ($totalPages > 1): ?>
-          <div class="list-pagination">
-            <?php if ($page > 1): ?>
-              <a class="pagination-link" href="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page - 1; ?>">Previous</a>
-            <?php endif; ?>
-
-            <span class="pagination-status">Page <?php echo $page; ?> of <?php echo $totalPages; ?></span>
-
-            <?php if ($page < $totalPages): ?>
-              <a class="pagination-link" href="subtasks.php?habit_id=<?php echo $habitId; ?>&page=<?php echo $page + 1; ?>">Next</a>
-            <?php endif; ?>
-          </div>
-        <?php endif; ?>
       <?php endif; ?>
+
+      <!-- Edit dialog -->
+      <div id="edit-subtask-dialog" title="Edit Subtask" style="display:none;">
+        <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>" id="edit-subtask-form">
+          <input type="hidden" name="action" value="update">
+          <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
+          <input type="hidden" name="subtask_id" id="edit-subtask-id">
+
+          <div class="field"><input type="text" name="subtask_name" id="edit-subtask-name" required></div>
+          <div class="field"><input type="text" name="description" id="edit-subtask-description" placeholder="Description (optional)"></div>
+          <div class="field field-checkbox">
+            <input type="checkbox" name="is_optional" id="edit-subtask-optional" class="checkbox-input">
+            <label for="edit-subtask-optional" class="checkbox-label">This subtask is optional</label>
+          </div>
+
+          <button type="submit" class="btn-primary">Save changes</button>
+        </form>
+      </div>
+
+      <!-- Log dialog -->
+      <div id="log-subtask-dialog" title="Log Today" style="display:none;">
+        <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>" id="log-subtask-form">
+          <input type="hidden" name="action" value="log_completion">
+          <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
+          <input type="hidden" name="subtask_id" id="log-subtask-id">
+
+          <div class="field"><input type="number" name="log_value" id="log-subtask-value" placeholder="Value (optional)"></div>
+          <div class="field"><input type="text" name="log_unit" id="log-subtask-unit" placeholder="Unit (e.g. kg, minutes, reps)"></div>
+
+          <button type="submit" class="btn-primary">Save log</button>
+        </form>
+        <form method="POST" action="subtasks.php?habit_id=<?php echo $habitId; ?>" id="clear-log-form" style="display:none;">
+          <input type="hidden" name="action" value="clear_log">
+          <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
+          <input type="hidden" name="subtask_id" id="clear-log-subtask-id">
+          <button type="submit" class="btn-delete">Clear today's log</button>
+        </form>
+      </div>
+
     </div>
   </div>
+
+  <script>
+    window.SUBTASKS_DATA = <?php echo json_encode($subtasksForJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.FAILED_EDIT = <?php echo $failedEditValues ? json_encode($failedEditValues, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) : 'null'; ?>;
+    window.FAILED_LOG = <?php echo $failedLogValues ? json_encode($failedLogValues, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) : 'null'; ?>;
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+  <script src="https://cdn.datatables.net/v/dt/dt-3.0.2/datatables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/confirm-delete.js"></script>
+  <script src="subtasks-datatable.js"></script>
 </body>
 </html>

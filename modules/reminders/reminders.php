@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            header('Location: reminders.php');
+            header('Location: reminders.php?success=add');
             exit;
         }
     }
@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            header('Location: reminders.php');
+            header('Location: reminders.php?success=toggle_active');
             exit;
         }
     }
@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            header('Location: reminders.php');
+            header('Location: reminders.php?success=delete');
             exit;
         }
     }
@@ -138,6 +138,7 @@ mysqli_stmt_close($reminderStmt);
   <link rel="stylesheet" href="reminders.css?v=20260801-3">
 </head>
 <body>
+  <script>window.SERVER_ERRORS = <?php echo json_encode($errors, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
@@ -220,7 +221,7 @@ mysqli_stmt_close($reminderStmt);
                 <form method="POST" action="reminders.php">
                   <input type="hidden" name="action" value="delete">
                   <input type="hidden" name="reminder_id" value="<?php echo $r['reminder_id']; ?>">
-                  <button type="submit" class="btn-delete">Delete</button>
+                  <button type="button" class="btn-delete" data-confirm-message="Delete this reminder? This cannot be undone.">Delete</button>
                 </form>
               </div>
             </div>
@@ -247,6 +248,10 @@ mysqli_stmt_close($reminderStmt);
         echo json_encode($activeRemindersForJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     ?>;
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/assets/js/toast.js"></script>
+  <script src="/assets/js/confirm-delete.js"></script>
   <script src="reminders.js"></script>
 </body>
 </html>

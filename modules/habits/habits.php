@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_stmt_execute($stmt);
                 mysqli_stmt_close($stmt);
 
-                header('Location: habits.php');
+                header('Location: habits.php?success=add');
                 exit;
             }
         }
@@ -156,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($affected === 0) {
                     $errors[] = 'Habit not found.';
                 } else {
-                    header('Location: habits.php');
+                    header('Location: habits.php?success=update');
                     exit;
                 }
             }
@@ -189,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            header('Location: habits.php');
+            header('Location: habits.php?success=delete');
             exit;
         }
     }
@@ -249,6 +249,7 @@ $habitsForJs = array_map(function ($h) {
   <link rel="stylesheet" href="habits.css?v=20260801-6">
 </head>
 <body>
+  <script>window.SERVER_ERRORS = <?php echo json_encode($errors, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
@@ -427,5 +428,6 @@ $habitsForJs = array_map(function ($h) {
   <script src="https://cdn.datatables.net/v/dt/dt-3.0.2/datatables.min.js"></script>
   <script src="habits.js"></script>
   <script src="habits-datatable.js"></script>
+  <script src="/assets/js/toast.js"></script>
 </body>
 </html>

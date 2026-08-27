@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 calculateAndSaveStreak($conn, $habitId);
 
-                redirect('dashboard.php');
+                redirect('dashboard.php?success=update');
             }
         }
     }
@@ -103,6 +103,7 @@ mysqli_stmt_close($stmt);
   <link rel="stylesheet" href="dashboard.css?v=20260811-3">
 </head>
 <body>
+  <script>window.SERVER_ERRORS = <?php echo json_encode($errors, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
@@ -153,6 +154,8 @@ mysqli_stmt_close($stmt);
         </div>
       <?php endif; ?>
     </div>
-  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/assets/js/toast.js"></script>
 </body>
 </html>
