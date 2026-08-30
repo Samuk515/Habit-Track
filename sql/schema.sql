@@ -31,11 +31,22 @@ CREATE TABLE HABIT (
   FOREIGN KEY (category_id) REFERENCES CATEGORY(category_id) ON DELETE CASCADE
 );
 
--- HABIT_LOG table (note: references HABIT table)
+-- SUBTASK table (references HABIT table)
+CREATE TABLE SUBTASK (
+  subtask_id INT AUTO_INCREMENT PRIMARY KEY,
+  habit_id INT NOT NULL,
+  subtask_name VARCHAR(150) NOT NULL,
+  description VARCHAR(255),
+  is_optional TINYINT(1) NOT NULL DEFAULT 0,
+  order_no INT NOT NULL DEFAULT 0,
+  FOREIGN KEY (habit_id) REFERENCES HABIT(habit_id) ON DELETE CASCADE
+);
+
+-- HABIT_LOG table (note: references HABIT and SUBTASK tables)
 CREATE TABLE HABIT_LOG (
   log_id INT AUTO_INCREMENT PRIMARY KEY,
   habit_id INT NOT NULL,
-  subhabit_id INT NULL,
+  subtask_id INT NULL,
   log_date DATE NOT NULL,
   value INT NULL,
   unit VARCHAR(30) NULL,
@@ -43,7 +54,7 @@ CREATE TABLE HABIT_LOG (
   notes VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (habit_id) REFERENCES HABIT(habit_id) ON DELETE CASCADE,
-  FOREIGN KEY (subhabit_id) REFERENCES SUBTASK(subtask_id) ON DELETE SET NULL,
+  FOREIGN KEY (subtask_id) REFERENCES SUBTASK(subtask_id) ON DELETE SET NULL,
   UNIQUE KEY unique_habit_per_day (habit_id, log_date)
 );
 
@@ -53,17 +64,6 @@ CREATE TABLE STREAK (
   habit_id INT NOT NULL UNIQUE,
   current_streak INT NOT NULL DEFAULT 0,
   longest_streak INT NOT NULL DEFAULT 0,
-  FOREIGN KEY (habit_id) REFERENCES HABIT(habit_id) ON DELETE CASCADE
-);
-
--- SUBTASK table (references HABIT table)
-CREATE TABLE SUBTASK (
-  subtask_id INT AUTO_INCREMENT PRIMARY KEY,
-  habit_id INT NOT NULL,
-  subtask_name VARCHAR(150) NOT NULL,
-  description VARCHAR(255),
-  is_optional TINYINT(1) NOT NULL DEFAULT 0,
-  order_no INT NOT NULL DEFAULT 0,
   FOREIGN KEY (habit_id) REFERENCES HABIT(habit_id) ON DELETE CASCADE
 );
 
@@ -77,13 +77,16 @@ CREATE TABLE Bad_Habit_Progress (
   FOREIGN KEY (log_id) REFERENCES HABIT_LOG(log_id) ON DELETE CASCADE
 );
 
--- REMINDER table (references SUBTASK table)
+-- REMINDER table (references USER and optional SUBTASK)
 CREATE TABLE IF NOT EXISTS REMINDER (
     reminder_id INT AUTO_INCREMENT PRIMARY KEY,
-    subtask_id INT NOT NULL,
+    user_id INT NOT NULL,
+    subtask_id INT NULL,
+    label VARCHAR(255) NULL,
     reminder_time TIME NOT NULL,
     reminder_type ENUM('once', 'daily', 'weekly') NOT NULL DEFAULT 'daily',
     is_active TINYINT(1) NOT NULL DEFAULT 1,
+    FOREIGN KEY (user_id) REFERENCES USER(user_id) ON DELETE CASCADE,
     FOREIGN KEY (subtask_id) REFERENCES SUBTASK(subtask_id) ON DELETE CASCADE
 );
 
