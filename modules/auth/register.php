@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once '../../includes/db.php';
+require_once '../../includes/email_verification.php';
 
 $errors = [];
 $name = '';
@@ -45,13 +46,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $insertStmt = mysqli_prepare(
             $conn,
-            'INSERT INTO USER (name, email, password, created_at) VALUES (?, ?, ?, NOW())'
+            'INSERT INTO USER (name, email, password, email_verified_at, created_at) VALUES (?, ?, ?, NULL, NOW())'
         );
         mysqli_stmt_bind_param($insertStmt, 'sss', $name, $email, $hashedPassword);
 
         if (mysqli_stmt_execute($insertStmt)) {
+            $userId = mysqli_insert_id($conn);
             mysqli_stmt_close($insertStmt);
-            header('Location: /modules/auth/login.php?registered=1');
+            $token = createEmailVerificationToken($conn, (int) $userId);
+            $emailSent = sendVerificationEmail($email, $name, $token);
+
+            header('Location: /modules/auth/login.php?registered=1&verification_sent=' . ($emailSent ? '1' : '0'));
             exit;
         }
 

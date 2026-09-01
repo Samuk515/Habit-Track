@@ -11,8 +11,17 @@ services:
       DB_NAME: habit_track_db
       DB_USER: root
       DB_PASS: root
+      APP_URL: http://localhost:8080
+      SMTP_HOST: ""
+      SMTP_PORT: 587
+      SMTP_SECURE: tls
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
+      MAIL_FROM: no-reply@habit-track.local
+      MAIL_FROM_NAME: Habit Track
     volumes:
       - ./:/var/www/html
+      - /var/www/html/vendor
     depends_on:
       - db
 

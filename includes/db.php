@@ -22,7 +22,16 @@ $ddlStatements = [
         name VARCHAR(100) NOT NULL,
         email VARCHAR(150) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
+        email_verified_at TIMESTAMP NULL DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )",
+    "CREATE TABLE IF NOT EXISTS EMAIL_VERIFICATION (
+        verification_id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        token_hash CHAR(64) NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES USER(user_id) ON DELETE CASCADE
     )",
     "CREATE TABLE IF NOT EXISTS CATEGORY (
         category_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -111,5 +120,20 @@ foreach ($ddlStatements as $sql) {
         error_log('DB schema creation failed: ' . mysqli_error($conn) . ' :: ' . $sql);
         die('A system error occurred while initializing the database.');
     }
+}
+
+$userColumnsResult = mysqli_query($conn, "SHOW COLUMNS FROM USER LIKE 'email_verified_at'");
+if ($userColumnsResult && mysqli_num_rows($userColumnsResult) === 0) {
+    $alterResult = mysqli_query(
+        $conn,
+        'ALTER TABLE USER ADD COLUMN email_verified_at TIMESTAMP NULL DEFAULT NULL AFTER password'
+    );
+
+    if ($alterResult === false) {
+        error_log('DB schema migration failed: ' . mysqli_error($conn));
+        die('A system error occurred while updating the database.');
+    }
+
+    mysqli_query($conn, 'UPDATE USER SET email_verified_at = COALESCE(email_verified_at, created_at, NOW())');
 }
 ;

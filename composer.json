@@ -1,0 +1,8 @@
+{
+    "name": "samirsingh/habit-track",
+    "description": "A PHP and MySQL habit tracking application.",
+    "license": "proprietary",
+    "require": {
+        "phpmailer/phpmailer": "^7.0"
+    }
+}

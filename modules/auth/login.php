@@ -4,7 +4,7 @@ require_once '../../includes/auth.php';
 require_once '../../includes/db.php';
 
 $errors = [];
-$email = '';
+$email = trim($_GET['email'] ?? '');
 
 if (isLoggedIn()) {
     header('Location: /modules/dashboard/dashboard.php');
@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        $stmt = mysqli_prepare($conn, 'SELECT user_id, name, password FROM USER WHERE email = ?');
+        $stmt = mysqli_prepare($conn, 'SELECT user_id, name, password, email_verified_at FROM USER WHERE email = ?');
         mysqli_stmt_bind_param($stmt, 's', $email);
         mysqli_stmt_execute($stmt);
         $result = mysqli_stmt_get_result($stmt);
@@ -31,6 +31,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // email exists or the password was wrong specifically.
         if (!$user || !password_verify($password, $user['password'])) {
             $errors[] = 'Invalid email or password.';
+        } elseif ($user['email_verified_at'] === null) {
+            $resendUrl = 'resend-verification.php?email=' . urlencode($email);
+            $errors[] = 'Please verify your email before logging in. <a href="' . htmlspecialchars($resendUrl, ENT_QUOTES, 'UTF-8') . '">Resend verification email</a>.';
         } else {
             session_regenerate_id(true);
             $_SESSION['user_id'] = $user['user_id'];
@@ -57,14 +60,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <h1 class="auth-title">Welcome back</h1>
 
         <?php if (isset($_GET['registered'])): ?>
-        <div class="auth-success">Account created — please log in.</div>
+        <div class="auth-success">
+            Account created. Please check your email to verify your account before logging in.
+            <?php if (($_GET['verification_sent'] ?? '') === '0'): ?>
+            We could not send the email automatically; check the server logs for the verification link.
+            <?php endif; ?>
+        </div>
         <?php endif; ?>
 
         <?php if (!empty($errors)): ?>
         <div class="auth-errors">
             <ul>
                 <?php foreach ($errors as $error): ?>
-                <li><?= htmlspecialchars($error) ?></li>
+                <li><?= str_contains($error, '<a ') ? $error : htmlspecialchars($error) ?></li>
                 <?php endforeach; ?>
             </ul>
         </div>

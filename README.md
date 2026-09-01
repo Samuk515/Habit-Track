@@ -9,7 +9,8 @@ Habit Track lets users organize habits into categories, break them into subtasks
 ## Tech Stack
 
 - **Frontend:** HTML, CSS, JavaScript
-- **Backend:** PHP (PDO)
+- **Backend:** PHP 
+- **Email:** PHPMailer
 - **Database:** MySQL
 - **Containerization:** Docker & Docker Compose
 - **Web server:** Apache (php:8.2-apache)
@@ -21,6 +22,7 @@ Habit Track lets users organize habits into categories, break them into subtasks
 
 ### Implemented
 - Secure user registration (CSRF protection, input validation, password hashing)
+- Email verification for new accounts
 - Secure login (session-based auth, generic error messaging, session regeneration)
 - Logout with full session and cookie cleanup
 - Session-protected dashboard with habit overview and streak display
@@ -41,6 +43,7 @@ The system is built on a locked, 9-entity ER diagram:
 | Entity | Description |
 |---|---|
 | USER | Registered user accounts |
+| EMAIL_VERIFICATION | Email verification tokens for new accounts |
 | CATEGORY | User-defined habit categories |
 | HABIT | Individual habits under a category |
 | SUBTASK | Breakdown items within a habit |
@@ -72,7 +75,9 @@ habit-track/
 │   ├── auth/
 │   │   ├── login.php
 │   │   ├── logout.php
-│   │   └── register.php
+│   │   ├── register.php
+│   │   ├── resend-verification.php
+│   │   └── verify-email.php
 │   ├── calendar/
 │   │   ├── Calendar.php
 │   │   ├── Calendar.css
@@ -113,14 +118,35 @@ habit-track/
    git clone https://github.com/Samuk515/Habit-Track.git habit-track
    cd habit-track
    ```
-3. Start the stack:
+3. Install PHP dependencies for local development:
+   ```bash
+   composer install
+   ```
+4. Start the stack:
    ```bash
    docker compose up --build
    ```
-4. The app will be available at `http://localhost:8080`.
-5. phpMyAdmin is available at `http://localhost:8081` (user: `root`, password: `root`).
-6. The database is auto-initialized from `sql/schema.sql` on first run.
-7. Visit `http://localhost/habit-track/public/register.php` to create an account.
+5. The app will be available at `http://localhost:8080`.
+6. phpMyAdmin is available at `http://localhost:8081` (user: `root`, password: `root`).
+7. The database is auto-initialized from `sql/schema.sql` on first run.
+8. Visit `http://localhost/habit-track/public/register.php` to create an account.
+
+## Email Verification
+
+New users must verify their email before logging in. Configure these environment variables in `docker-compose.yml` or your server environment:
+
+```bash
+APP_URL=http://localhost:8080
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=tls
+SMTP_USERNAME=your-smtp-user
+SMTP_PASSWORD=your-smtp-password
+MAIL_FROM=no-reply@example.com
+MAIL_FROM_NAME="Habit Track"
+```
+
+If SMTP is not configured or sending fails, the verification link is written to the PHP error log for local development.
 
 ## Development Roadmap
 
