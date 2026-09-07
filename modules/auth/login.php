@@ -68,6 +68,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <?php endif; ?>
 
+        <?php if (isset($_GET['email_changed'])): ?>
+        <div class="auth-success">
+            Your email was changed. Please verify the new address before logging in.
+        </div>
+        <?php endif; ?>
+
         <?php if (!empty($errors)): ?>
         <div class="auth-errors">
             <ul>

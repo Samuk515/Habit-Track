@@ -1,0 +1,45 @@
+.settings-content {
+    background: #EDE9E6 !important;
+}
+
+.settings-panel {
+    max-width: 560px;
+    padding: 24px;
+    background: var(--card);
+    border-radius: 8px;
+}
+
+.settings-panel h2 {
+    margin-bottom: 8px;
+    color: var(--purple-dark);
+}
+
+.settings-note {
+    margin-bottom: 20px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.settings-panel label {
+    display: block;
+    margin: 14px 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--teal);
+}
+
+.settings-panel input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--accent-light);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.settings-panel .btn-primary {
+    margin-top: 20px;
+}
+
+.settings-panel .error-box p + p {
+    margin-top: 4px;
+}
