@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_stmt_execute($insertStmt);
                 mysqli_stmt_close($insertStmt);
 
-                header('Location: subtasks.php?habit_id=' . $habitId . '&success=add');
+                header('Location: subtasks.php?habit_id=' . $habitId);
                 exit;
             }
         }
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($affected === 0) {
                     $errors[] = 'Subtask not found.';
                 } else {
-                    header('Location: subtasks.php?habit_id=' . $habitId . '&success=update');
+                    header('Location: subtasks.php?habit_id=' . $habitId);
                     exit;
                 }
             }
@@ -111,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($deleteStmt);
             mysqli_stmt_close($deleteStmt);
 
-            header('Location: subtasks.php?habit_id=' . $habitId . '&success=delete');
+            header('Location: subtasks.php?habit_id=' . $habitId);
             exit;
         }
     }
@@ -159,12 +159,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($existing) {
                         $logId = (int) $existing['log_id'];
-                        $updateStmt = mysqli_prepare($conn, "UPDATE HABIT_LOG SET subtask_id = ?, value = ?, unit = ?, status = 'done' WHERE log_id = ?");
+                        $updateStmt = mysqli_prepare($conn, "UPDATE HABIT_LOG SET subhabit_id = ?, value = ?, unit = ?, status = 'done' WHERE log_id = ?");
                         mysqli_stmt_bind_param($updateStmt, 'iisi', $logSubtaskId, $logValue, $logUnit, $logId);
                         mysqli_stmt_execute($updateStmt);
                         mysqli_stmt_close($updateStmt);
                     } else {
-                        $insertStmt = mysqli_prepare($conn, "INSERT INTO HABIT_LOG (habit_id, subtask_id, log_date, value, unit, status) VALUES (?, ?, CURDATE(), ?, ?, 'done')");
+                        $insertStmt = mysqli_prepare($conn, "INSERT INTO HABIT_LOG (habit_id, subhabit_id, log_date, value, unit, status) VALUES (?, ?, CURDATE(), ?, ?, 'done')");
                         mysqli_stmt_bind_param($insertStmt, 'iiis', $habitId, $logSubtaskId, $logValue, $logUnit);
                         mysqli_stmt_execute($insertStmt);
                         mysqli_stmt_close($insertStmt);
@@ -188,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     calculateAndSaveStreak($conn, $habitId);
 
-                    header('Location: subtasks.php?habit_id=' . $habitId . '&success=log');
+                    header('Location: subtasks.php?habit_id=' . $habitId);
                     exit;
                 }
             }
@@ -209,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (filter_var($logSubtaskId, FILTER_VALIDATE_INT) !== false) {
             $logSubtaskId = (int) $logSubtaskId;
 
-            $findStmt = mysqli_prepare($conn, 'SELECT log_id FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE() AND subtask_id = ?');
+            $findStmt = mysqli_prepare($conn, 'SELECT log_id FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE() AND subhabit_id = ?');
             mysqli_stmt_bind_param($findStmt, 'ii', $habitId, $logSubtaskId);
             mysqli_stmt_execute($findStmt);
             $findResult = mysqli_stmt_get_result($findStmt);
@@ -224,14 +224,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_stmt_close($clearEventStmt);
             }
 
-            $stmt = mysqli_prepare($conn, 'DELETE FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE() AND subtask_id = ?');
+            $stmt = mysqli_prepare($conn, 'DELETE FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE() AND subhabit_id = ?');
             mysqli_stmt_bind_param($stmt, 'ii', $habitId, $logSubtaskId);
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
             calculateAndSaveStreak($conn, $habitId);
 
-            header('Location: subtasks.php?habit_id=' . $habitId . '&success=clear_log');
+            header('Location: subtasks.php?habit_id=' . $habitId);
             exit;
         }
     }
@@ -288,9 +288,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$todayLogStmt = mysqli_prepare($conn, 'SELECT HABIT_LOG.subtask_id, HABIT_LOG.value, HABIT_LOG.unit, SUBTASK.subtask_name AS logged_subtask_name
+$todayLogStmt = mysqli_prepare($conn, 'SELECT HABIT_LOG.subhabit_id, HABIT_LOG.value, HABIT_LOG.unit, SUBTASK.subtask_name AS logged_subtask_name
     FROM HABIT_LOG
-    LEFT JOIN SUBTASK ON HABIT_LOG.subtask_id = SUBTASK.subtask_id
+    LEFT JOIN SUBTASK ON HABIT_LOG.subhabit_id = SUBTASK.subtask_id
     WHERE HABIT_LOG.habit_id = ? AND HABIT_LOG.log_date = CURDATE()');
 mysqli_stmt_bind_param($todayLogStmt, 'i', $habitId);
 mysqli_stmt_execute($todayLogStmt);
@@ -307,7 +307,7 @@ $subtasks = mysqli_fetch_all($subtaskResult, MYSQLI_ASSOC);
 mysqli_stmt_close($subtaskStmt);
 
 $subtasksForJs = array_map(function ($s) use ($todayLog) {
-    $isLoggedToday = $todayLog && (int) $todayLog['subtask_id'] === (int) $s['subtask_id'];
+    $isLoggedToday = $todayLog && (int) $todayLog['subhabit_id'] === (int) $s['subtask_id'];
     return [
         'id' => (int) $s['subtask_id'],
         'name' => $s['subtask_name'],
@@ -329,7 +329,6 @@ $subtasksForJs = array_map(function ($s) use ($todayLog) {
   <link rel="stylesheet" href="subtasks.css?v=20260801-6">
 </head>
 <body>
-  <script>window.SERVER_ERRORS = <?php echo json_encode($errors, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
@@ -338,6 +337,7 @@ $subtasksForJs = array_map(function ($s) use ($todayLog) {
       <a href="../categories/categories.php" class="nav-item">Categories</a>
       <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
       <a href="../calendar/calendar.php" class="nav-item">Calendar</a>
+      <a href="../settings/settings.php" class="nav-item">Settings</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
@@ -383,7 +383,7 @@ $subtasksForJs = array_map(function ($s) use ($todayLog) {
           </thead>
           <tbody>
             <?php foreach ($subtasks as $s): ?>
-              <?php $isLoggedToday = ($todayLog && (int) $todayLog['subtask_id'] === (int) $s['subtask_id']); ?>
+              <?php $isLoggedToday = ($todayLog && (int) $todayLog['subhabit_id'] === (int) $s['subtask_id']); ?>
               <tr>
                 <td><?php echo htmlspecialchars($s['subtask_name']); ?></td>
                 <td><?php echo $s['description'] ? htmlspecialchars($s['description']) : '—'; ?></td>
@@ -475,7 +475,6 @@ $subtasksForJs = array_map(function ($s) use ($todayLog) {
   <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
   <script src="https://cdn.datatables.net/v/dt/dt-3.0.2/datatables.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="/assets/js/toast.js"></script>
   <script src="/assets/js/confirm-delete.js"></script>
   <script src="subtasks-datatable.js"></script>
 </body>

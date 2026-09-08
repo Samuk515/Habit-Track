@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_stmt_execute($stmt);
                 mysqli_stmt_close($stmt);
 
-                header('Location: habits.php?success=add');
+                header('Location: habits.php');
                 exit;
             }
         }
@@ -156,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($affected === 0) {
                     $errors[] = 'Habit not found.';
                 } else {
-                    header('Location: habits.php?success=update');
+                    header('Location: habits.php');
                     exit;
                 }
             }
@@ -183,23 +183,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (filter_var($habitId, FILTER_VALIDATE_INT) !== false) {
             $habitId = (int) $habitId;
 
-            $stmt = mysqli_prepare($conn, 'DELETE FROM HABIT WHERE habit_id = ? AND
-            category_id IN (SELECT category_id FROM CATEGORY WHERE user_id = ?)');
-            mysqli_stmt_bind_param($stmt, 'ii', $habitId, $userId);
-            mysqli_stmt_execute($stmt);
-            mysqli_stmt_close($stmt);
+            // Ownership verified ONCE, here — every cascading delete
+            // below trusts this habit_id without re-checking.
+            $ownStmt = mysqli_prepare($conn, 'SELECT habit_id FROM HABIT WHERE habit_id = ? AND category_id IN (SELECT category_id FROM CATEGORY WHERE user_id = ?)');
+            mysqli_stmt_bind_param($ownStmt, 'ii', $habitId, $userId);
+            mysqli_stmt_execute($ownStmt);
+            $ownResult = mysqli_stmt_get_result($ownStmt);
+            $owns = mysqli_fetch_assoc($ownResult);
+            mysqli_stmt_close($ownStmt);
 
-            header('Location: habits.php?success=delete');
-            exit;
+            if ($owns) {
+                // Deleting a single habit needs the same cascade
+                // categories.php already does for deleting a whole
+                // category — this was previously missing here, which
+                // meant deleting a habit directly (not via its
+                // category) silently orphaned its SUBTASK, HABIT_LOG,
+                // and STREAK rows instead of cleaning them up.
+                mysqli_begin_transaction($conn);
+                $cascadeOk = true;
+
+                $steps = [
+                    'DELETE FROM Bad_Habit_Progress WHERE log_id IN (
+                        SELECT log_id FROM HABIT_LOG WHERE habit_id = ?
+                    )',
+                    'DELETE FROM CALENDAR_EVENT WHERE subtask_id IN (
+                        SELECT subtask_id FROM SUBTASK WHERE habit_id = ?
+                    )',
+                    'DELETE FROM REMINDER WHERE subtask_id IN (
+                        SELECT subtask_id FROM SUBTASK WHERE habit_id = ?
+                    )',
+                    'DELETE FROM SUBTASK WHERE habit_id = ?',
+                    'DELETE FROM HABIT_LOG WHERE habit_id = ?',
+                    'DELETE FROM STREAK WHERE habit_id = ?',
+                ];
+
+                foreach ($steps as $sql) {
+                    $stmt = mysqli_prepare($conn, $sql);
+                    mysqli_stmt_bind_param($stmt, 'i', $habitId);
+                    if (!mysqli_stmt_execute($stmt)) {
+                        $cascadeOk = false;
+                    }
+                    mysqli_stmt_close($stmt);
+                    if (!$cascadeOk) {
+                        break;
+                    }
+                }
+
+                if ($cascadeOk) {
+                    $finalStmt = mysqli_prepare($conn, 'DELETE FROM HABIT WHERE habit_id = ? AND category_id IN (SELECT category_id FROM CATEGORY WHERE user_id = ?)');
+                    mysqli_stmt_bind_param($finalStmt, 'ii', $habitId, $userId);
+                    $cascadeOk = mysqli_stmt_execute($finalStmt);
+                    mysqli_stmt_close($finalStmt);
+                }
+
+                if ($cascadeOk) {
+                    mysqli_commit($conn);
+                    header('Location: habits.php');
+                    exit;
+                }
+
+                mysqli_rollback($conn);
+                $errors[] = 'Could not delete this habit. Please try again.';
+            }
         }
     }
 }
 
 // DataTables handles pagination client-side now — fetch everything,
 // no LIMIT/OFFSET or page math needed server-side anymore.
-$habitStmt = mysqli_prepare($conn, 'SELECT HABIT.*, CATEGORY.category_name
-  FROM HABIT INNER JOIN CATEGORY ON HABIT.category_id = CATEGORY.category_id
+$habitStmt = mysqli_prepare($conn, 'SELECT HABIT.*, CATEGORY.category_name, COUNT(SUBTASK.subtask_id) AS subtask_count
+  FROM HABIT
+  INNER JOIN CATEGORY ON HABIT.category_id = CATEGORY.category_id
+  LEFT JOIN SUBTASK ON SUBTASK.habit_id = HABIT.habit_id
   WHERE CATEGORY.user_id = ?
+  GROUP BY HABIT.habit_id
   ORDER BY HABIT.created_at DESC');
 mysqli_stmt_bind_param($habitStmt, 'i', $userId);
 mysqli_stmt_execute($habitStmt);
@@ -249,7 +306,6 @@ $habitsForJs = array_map(function ($h) {
   <link rel="stylesheet" href="habits.css?v=20260801-6">
 </head>
 <body>
-  <script>window.SERVER_ERRORS = <?php echo json_encode($errors, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
@@ -258,6 +314,7 @@ $habitsForJs = array_map(function ($h) {
       <a href="../categories/categories.php" class="nav-item">Categories</a>
       <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
       <a href="../calendar/calendar.php" class="nav-item">Calendar</a>
+      <a href="../settings/settings.php" class="nav-item">Settings</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
@@ -361,7 +418,12 @@ $habitsForJs = array_map(function ($h) {
                   <form method="POST" action="habits.php" style="display:inline;">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="habit_id" value="<?php echo $h['habit_id']; ?>">
-                    <button type="submit" class="btn-delete">Delete</button>
+                    <?php
+                      $subtaskCount = (int) $h['subtask_count'];
+                      $habitDeleteMsg = 'Delete "' . $h['habit_name'] . '"? This will also delete '
+                          . $subtaskCount . ' subtask(s) and all logged history for this habit. This cannot be undone.';
+                    ?>
+                    <button type="button" class="btn-delete" data-confirm-message="<?php echo htmlspecialchars($habitDeleteMsg); ?>">Delete</button>
                   </form>
                 </td>
               </tr>
@@ -426,8 +488,9 @@ $habitsForJs = array_map(function ($h) {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
   <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
   <script src="https://cdn.datatables.net/v/dt/dt-3.0.2/datatables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/assets/js/confirm-delete.js"></script>
   <script src="habits.js"></script>
   <script src="habits-datatable.js"></script>
-  <script src="/assets/js/toast.js"></script>
 </body>
 </html>

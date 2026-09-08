@@ -22,6 +22,7 @@ $ddlStatements = [
         name VARCHAR(100) NOT NULL,
         email VARCHAR(150) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
+        notifications_enabled TINYINT(1) NOT NULL DEFAULT 1,
         email_verified_at TIMESTAMP NULL DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )",
@@ -135,5 +136,18 @@ if ($userColumnsResult && mysqli_num_rows($userColumnsResult) === 0) {
     }
 
     mysqli_query($conn, 'UPDATE USER SET email_verified_at = COALESCE(email_verified_at, created_at, NOW())');
+}
+
+$notificationsColumnResult = mysqli_query($conn, "SHOW COLUMNS FROM USER LIKE 'notifications_enabled'");
+if ($notificationsColumnResult && mysqli_num_rows($notificationsColumnResult) === 0) {
+    $alterResult = mysqli_query(
+        $conn,
+        'ALTER TABLE USER ADD COLUMN notifications_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER password'
+    );
+
+    if ($alterResult === false) {
+        error_log('DB schema migration failed: ' . mysqli_error($conn));
+        die('A system error occurred while updating the database.');
+    }
 }
 ;

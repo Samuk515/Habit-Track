@@ -21,6 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!btn || !status) return;
 
     const reminders = window.ACTIVE_REMINDERS || [];
+    const notificationsEnabled = window.NOTIFICATIONS_ENABLED !== false;
+    const notificationsSupported = 'Notification' in window;
     const notified = new Set();
 
     const updateStatus = (msg) => {
@@ -28,7 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const requestPermission = async () => {
-        if (!('Notification' in window)) {
+        if (!notificationsEnabled) {
+            updateStatus('Notifications are disabled in Settings.');
+            return;
+        }
+        if (!notificationsSupported) {
             updateStatus('Notifications not supported in this browser.');
             return;
         }
@@ -37,18 +43,28 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.style.display = 'none';
             return;
         }
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-            updateStatus('Notifications enabled.');
-            btn.style.display = 'none';
-        } else {
-            updateStatus('Notification permission denied.');
+        try {
+            const perm = await Notification.requestPermission();
+            if (perm === 'granted') {
+                updateStatus('Notifications enabled.');
+                btn.style.display = 'none';
+            } else {
+                updateStatus('Notification permission denied.');
+            }
+        } catch (error) {
+            updateStatus('Unable to enable notifications in this browser.');
         }
     };
 
     btn.addEventListener('click', requestPermission);
 
-    if (Notification.permission === 'granted') {
+    if (!notificationsEnabled) {
+        btn.style.display = 'none';
+        updateStatus('Notifications are disabled in Settings.');
+    } else if (!notificationsSupported) {
+        btn.style.display = 'none';
+        updateStatus('Notifications not supported in this browser.');
+    } else if (Notification.permission === 'granted') {
         btn.style.display = 'none';
         updateStatus('Notifications enabled.');
     }
@@ -56,30 +72,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkReminders = () => {
         const now = new Date();
         const currentTime = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')
+            + '-' + String(now.getDate()).padStart(2, '0');
 
         reminders.forEach((r) => {
             if (r.time !== currentTime) return;
 
-            const key = r.id + '-' + currentTime;
+            const key = r.type === 'once' ? 'habit-track-reminder-once-' + r.id : r.id + '-' + today;
+            if (r.type === 'once' && localStorage.getItem(key) === '1') return;
             if (notified.has(key)) return;
             notified.add(key);
 
-            if (Notification.permission === 'granted') {
+            if (notificationsEnabled && notificationsSupported && Notification.permission === 'granted') {
                 new Notification(r.label || 'Reminder', {
                     body: r.time + ' · ' + r.type,
                     icon: '/assets/images/icon.png',
                 });
+                if (r.type === 'once') {
+                    localStorage.setItem(key, '1');
+                }
             }
         });
-
-        setTimeout(() => {
-            notified.forEach((key) => {
-                const [id, time] = key.split('-');
-                if (time !== currentTime) {
-                    notified.delete(key);
-                }
-            });
-        }, 60000);
     };
 
     checkReminders();

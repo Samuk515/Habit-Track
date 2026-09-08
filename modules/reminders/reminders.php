@@ -5,6 +5,14 @@ requireLogin();
 require __DIR__ . '/../../includes/db.php';
 
 $userId = (int) $_SESSION['user_id'];
+
+$prefStmt = mysqli_prepare($conn, 'SELECT notifications_enabled FROM USER WHERE user_id = ?');
+mysqli_stmt_bind_param($prefStmt, 'i', $userId);
+mysqli_stmt_execute($prefStmt);
+$prefResult = mysqli_stmt_get_result($prefStmt);
+$prefRow = mysqli_fetch_assoc($prefResult);
+mysqli_stmt_close($prefStmt);
+$notificationsEnabled = $prefRow ? (bool) $prefRow['notifications_enabled'] : true;
 $errors = [];
 
 $subtaskOptStmt = mysqli_prepare($conn, 'SELECT SUBTASK.subtask_id, SUBTASK.subtask_name, HABIT.habit_name
@@ -73,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            header('Location: reminders.php?success=add');
+            header('Location: reminders.php');
             exit;
         }
     }
@@ -93,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            header('Location: reminders.php?success=toggle_active');
+            header('Location: reminders.php');
             exit;
         }
     }
@@ -109,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            header('Location: reminders.php?success=delete');
+            header('Location: reminders.php');
             exit;
         }
     }
@@ -138,7 +146,6 @@ mysqli_stmt_close($reminderStmt);
   <link rel="stylesheet" href="reminders.css?v=20260801-3">
 </head>
 <body>
-  <script>window.SERVER_ERRORS = <?php echo json_encode($errors, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
@@ -147,6 +154,7 @@ mysqli_stmt_close($reminderStmt);
       <a href="../categories/categories.php" class="nav-item">Categories</a>
       <a href="reminders.php" class="nav-item active">Reminders</a>
       <a href="../calendar/calendar.php" class="nav-item">Calendar</a>
+      <a href="../settings/settings.php" class="nav-item">Settings</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
@@ -231,6 +239,7 @@ mysqli_stmt_close($reminderStmt);
     </div>
   </div>
   <script>
+    window.NOTIFICATIONS_ENABLED = <?php echo $notificationsEnabled ? 'true' : 'false'; ?>;
     window.ACTIVE_REMINDERS = <?php
         $activeRemindersForJs = [];
         foreach ($reminders as $r) {
@@ -250,7 +259,6 @@ mysqli_stmt_close($reminderStmt);
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="/assets/js/toast.js"></script>
   <script src="/assets/js/confirm-delete.js"></script>
   <script src="reminders.js"></script>
 </body>

@@ -80,9 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            calculateAndSaveStreak($conn, $habitId);
-
-            redirect('bad-habit-progress.php?habit_id=' . $habitId . '&success=add');
+            redirect('bad-habit-progress.php?habit_id=' . $habitId);
         }
     }
 
@@ -105,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            redirect('bad-habit-progress.php?habit_id=' . $habitId . '&success=delete');
+            redirect('bad-habit-progress.php?habit_id=' . $habitId);
         }
     }
 }
@@ -125,11 +123,9 @@ mysqli_stmt_close($progressStmt);
 <html>
 <head>
   <title>Progress — Habit Track</title>
-  <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="bad-habit-progress.css?v=20260801-2">
 </head>
 <body>
-  <script>window.SERVER_ERRORS = <?php echo json_encode($errors, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
@@ -138,6 +134,7 @@ mysqli_stmt_close($progressStmt);
       <a href="../categories/categories.php" class="nav-item">Categories</a>
       <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
       <a href="../calendar/calendar.php" class="nav-item">Calendar</a>
+      <a href="../settings/settings.php" class="nav-item">Settings</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
@@ -173,7 +170,7 @@ mysqli_stmt_close($progressStmt);
               <div>
                 <div class="progress-date"><?php echo htmlspecialchars($p['log_date']); ?></div>
                 <div class="progress-value">
-                  <?php echo $p['value'] !== null ? htmlspecialchars((string) $p['value']) : 'Occurred'; ?>
+                  <?php echo $p['value'] !== null ? htmlspecialchars($p['value']) : 'Occurred'; ?>
                 </div>
                 <?php if ($p['notes']): ?>
                   <div class="progress-notes"><?php echo htmlspecialchars($p['notes']); ?></div>
@@ -183,16 +180,13 @@ mysqli_stmt_close($progressStmt);
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="habit_id" value="<?php echo $habitId; ?>">
                 <input type="hidden" name="progress_id" value="<?php echo $p['progress_id']; ?>">
-                <button type="button" class="btn-delete" data-confirm-message="Delete this entry? This cannot be undone.">Delete</button>
+                <button type="submit" class="btn-delete">Delete</button>
               </form>
             </div>
           <?php endforeach; ?>
         </div>
       <?php endif; ?>
     </div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="/assets/js/toast.js"></script>
-  <script src="/assets/js/confirm-delete.js"></script>
+  </div>
 </body>
 </html>

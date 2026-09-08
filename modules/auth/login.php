@@ -74,6 +74,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <?php endif; ?>
 
+        <?php if (isset($_GET['account_deleted'])): ?>
+        <div class="auth-success">
+            Your account and all associated data have been permanently deleted.
+        </div>
+        <?php endif; ?>
+
         <?php if (!empty($errors)): ?>
         <div class="auth-errors">
             <ul>

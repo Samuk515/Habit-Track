@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_stmt_execute($stmt);
                 mysqli_stmt_close($stmt);
 
-                header('Location: categories.php?success=add');
+                header('Location: categories.php');
                 exit;
             }
         }
@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($affected === 0) {
                     $errors[] = 'Category not found.';
                 } else {
-                    header('Location: categories.php?success=update');
+                    header('Location: categories.php');
                     exit;
                 }
             }
@@ -144,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($cascadeOk) {
                     mysqli_commit($conn);
-                    header('Location: categories.php?success=delete');
+                    header('Location: categories.php');
                     exit;
                 }
 
@@ -188,7 +188,6 @@ $categoriesForJs = array_map(function ($c) {
   <link rel="stylesheet" href="categories.css?v=20260801-4">
 </head>
 <body>
-  <script>window.SERVER_ERRORS = <?php echo json_encode($errors, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
   <div class="app-layout">
     <div class="sidebar">
       <?php require __DIR__ . '/../../includes/logo.php'; ?>
@@ -197,6 +196,7 @@ $categoriesForJs = array_map(function ($c) {
       <a href="categories.php" class="nav-item active">Categories</a>
       <a href="../reminders/reminders.php" class="nav-item">Reminders</a>
       <a href="../calendar/calendar.php" class="nav-item">Calendar</a>
+      <a href="../settings/settings.php" class="nav-item">Settings</a>
       <div class="sidebar-footer">
         <a href="../auth/logout.php" class="nav-item">Logout</a>
       </div>
@@ -279,7 +279,6 @@ $categoriesForJs = array_map(function ($c) {
   <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
   <script src="https://cdn.datatables.net/v/dt/dt-3.0.2/datatables.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="/assets/js/toast.js"></script>
   <script src="/assets/js/confirm-delete.js"></script>
   <script src="categories-datatable.js"></script>
 </body>

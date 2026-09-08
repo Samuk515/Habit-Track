@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
-require_once '../../includes/db.php';
-require_once '../../includes/email_verification.php';
+require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/email_verification.php';
 
 $email = trim($_POST['email'] ?? $_GET['email'] ?? '');
 $message = '';
