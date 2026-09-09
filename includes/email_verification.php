@@ -45,7 +45,10 @@ function sendVerificationEmail(string $email, string $name, string $token): bool
             $mail->isSMTP();
             $mail->Host = $smtpHost;
             $mail->Port = (int) (getenv('SMTP_PORT') ?: 587);
-            $mail->SMTPSecure = getenv('SMTP_SECURE') ?: PHPMailer::ENCRYPTION_STARTTLS;
+            $smtpSecure = getenv('SMTP_SECURE');
+            if ($smtpSecure !== false && $smtpSecure !== '') {
+                $mail->SMTPSecure = $smtpSecure;
+            }
 
             $smtpUsername = getenv('SMTP_USERNAME') ?: '';
             if ($smtpUsername !== '') {

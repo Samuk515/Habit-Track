@@ -9,7 +9,7 @@ Habit Track lets users organize habits into categories, break them into subtasks
 ## Tech Stack
 
 - **Frontend:** HTML, CSS, JavaScript
-- **Backend:** PHP 
+- **Backend:** PHP 8.2
 - **Email:** PHPMailer
 - **Database:** MySQL
 - **Containerization:** Docker & Docker Compose
@@ -34,7 +34,7 @@ Habit Track lets users organize habits into categories, break them into subtasks
 - Bad habit progress tracking with value and notes
 - Reminders linked to subtasks (once, daily, weekly) with pause/resume
 - Calendar auto-populated from subtask activity with month grid and activity log
-- Future category-based expansion (Finance, Health, Goals) without altering the ER schema
+- Category-based expansion without altering the ER schema
 
 ## Database Design
 
@@ -49,7 +49,7 @@ The system is built on a locked, 9-entity ER diagram:
 | SUBTASK | Breakdown items within a habit |
 | HABIT_LOG | Daily completion records |
 | STREAK | Auto-calculated current and longest streak per habit |
-| Bad_Habit_Progress | Progress tracking for habits marked "bad" |
+| BAD_HABIT_PROGRESS | Progress tracking for habits marked "bad" |
 | REMINDER | Reminders linked to subtasks |
 | CALENDAR_EVENT | Calendar entries auto-generated from subtask activity |
 
@@ -60,11 +60,15 @@ The system is built on a locked, 9-entity ER diagram:
 ```
 habit-track/
 ├── apache.conf
+├── composer.json
 ├── docker-compose.yml
 ├── Dockerfile
+├── index.php                  # Landing page and application entry point
+├── landing.css
 ├── assets/
-│   └── css/
-│       └── style.css
+│   ├── css/
+│   ├── images/
+│   └── js/
 ├── includes/
 │   ├── auth.php
 │   ├── csrf.php
@@ -78,6 +82,10 @@ habit-track/
 │   │   ├── register.php
 │   │   ├── resend-verification.php
 │   │   └── verify-email.php
+│   ├── admin/
+│   │   ├── dashboard.php
+│   │   ├── login.php
+│   │   └── logout.php
 │   ├── calendar/
 │   │   ├── Calendar.php
 │   │   ├── Calendar.css
@@ -102,38 +110,73 @@ habit-track/
 │       ├── subtasks.php
 │       └── subtasks.css
 ├── sql/
-│   └── schema.sql
-└── public/
-    ├── register.php
-    ├── login.php
-    ├── logout.php
-    └── dashboard.php
+│   └── schema.sql              # MySQL schema loaded on first database start
+└── vendor/                     # Composer dependencies
 ```
 
 ## Setup Instructions
 
-1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/).
-2. Clone this repository:
+### Docker (recommended)
+
+Prerequisites: [Docker Desktop](https://docs.docker.com/get-docker/) with Docker Compose.
+
+1. Clone this repository:
    ```bash
-   git clone https://github.com/Samuk515/Habit-Track.git habit-track
-   cd habit-track
+   git clone https://github.com/Samuk515/Habit-Track.git
+   cd Habit-Track
    ```
-3. Install PHP dependencies for local development:
-   ```bash
-   composer install
-   ```
-4. Start the stack:
+2. Start the application stack:
    ```bash
    docker compose up --build
    ```
-5. The app will be available at `http://localhost:8080`.
-6. phpMyAdmin is available at `http://localhost:8081` (user: `root`, password: `root`).
-7. The database is auto-initialized from `sql/schema.sql` on first run.
-8. Visit `http://localhost/habit-track/public/register.php` to create an account.
+3. Open the application at <http://localhost:8080>.
+4. Create an account from the **Sign Up** link, or go directly to <http://localhost:8080/modules/auth/register.php>.
+
+The stack includes:
+
+| Service | Address | Purpose |
+|---|---|---|
+| Habit Track | <http://localhost:8080> | PHP application |
+| phpMyAdmin | <http://localhost:8081> | Database administration |
+| Mailpit | <http://localhost:8025> | Local email inbox |
+| Admin panel | <http://localhost:8080/modules/admin/login.php> | User verification and Mailpit link |
+| MySQL | `localhost:3307` | Database access from the host |
+
+The MySQL database is initialized from `sql/schema.sql` the first time the database volume is created. To recreate the database from the schema, remove the existing volume before starting the stack again:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+### Local PHP development
+
+1. Install PHP 8.2+, MySQL 8+, Composer, and Apache.
+2. Install the PHP dependency:
+   ```bash
+   composer install
+   ```
+3. Create the `habit_track_db` database and import `sql/schema.sql`.
+4. Configure the database environment variables used by `includes/db.php`, then serve the repository root through Apache.
+
+The Docker development credentials are `root` / `root`. Do not reuse these credentials in a production deployment.
+
+### Admin panel
+
+Open <http://localhost:8080/modules/admin/login.php> to access the admin panel. The Docker development credentials are:
+
+```text
+Email: Singhsamir515@gmail.com
+Password: 1234567890
+```
+
+The admin panel can list registered users, manually verify an email address, resend a verification email through Mailpit, and open the Mailpit inbox. Change `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `docker-compose.yml` before using the application outside local development.
 
 ## Email Verification
 
-New users must verify their email before logging in. Configure these environment variables in `docker-compose.yml` or your server environment:
+New users must verify their email before logging in. The Docker setup uses Mailpit for local email delivery. After registering, open <http://localhost:8025> and click the verification message.
+
+For a non-Docker or production deployment, configure these environment variables in `docker-compose.yml` or your server environment:
 
 ```bash
 APP_URL=http://localhost:8080
@@ -146,7 +189,24 @@ MAIL_FROM=no-reply@example.com
 MAIL_FROM_NAME="Habit Track"
 ```
 
-If SMTP is not configured or sending fails, the verification link is written to the PHP error log for local development.
+`SMTP_SECURE` should be `tls` for a typical port 587 provider. For Mailpit, leave it empty and use port 1025. Never commit real SMTP credentials to the repository.
+
+## Development
+
+PHP dependencies are managed with Composer. JavaScript and CSS are served directly by Apache; there is no frontend build step.
+
+Useful commands:
+
+```bash
+# Start the application and follow logs
+docker compose up
+
+# Stop the application without deleting database data
+docker compose down
+
+# Check the PHP dependency tree
+composer show
+```
 
 ## Development Roadmap
 

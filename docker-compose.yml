@@ -12,13 +12,15 @@ services:
       DB_USER: root
       DB_PASS: root
       APP_URL: http://localhost:8080
-      SMTP_HOST: ""
-      SMTP_PORT: 587
-      SMTP_SECURE: tls
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_SECURE: ""
       SMTP_USERNAME: ""
       SMTP_PASSWORD: ""
       MAIL_FROM: no-reply@habit-track.local
       MAIL_FROM_NAME: Habit Track
+      ADMIN_EMAIL: Singhsamir515@gmail.com
+      ADMIN_PASSWORD: 1234567890
     volumes:
       - ./:/var/www/html
       - /var/www/html/vendor
@@ -50,6 +52,14 @@ services:
       PMA_PASSWORD: root
     depends_on:
       - db
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: habittrack_mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
 
 volumes:
   db_data:
