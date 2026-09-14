@@ -3,7 +3,6 @@ declare(strict_types=1);
 require __DIR__ . '/../../includes/auth.php';
 requireLogin();
 require __DIR__ . '/../../includes/db.php';
-require __DIR__ . '/../../includes/email_verification.php';
 require __DIR__ . '/../../includes/csrf.php';
 
 $userId = (int) $_SESSION['user_id'];
@@ -34,55 +33,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    if ($action === 'change_email') {
-        $newEmail = trim($_POST['email'] ?? '');
-        $currentPassword = $_POST['current_password_email'] ?? '';
+    if ($action === 'add_secondary_email') {
+        $secondaryEmail = trim($_POST['secondary_email'] ?? '');
 
-        if (!filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
+        if (!filter_var($secondaryEmail, FILTER_VALIDATE_EMAIL)) {
             $errors[] = 'Please enter a valid email address.';
         }
 
-        $userStmt = mysqli_prepare($conn, 'SELECT password FROM USER WHERE user_id = ?');
-        mysqli_stmt_bind_param($userStmt, 'i', $userId);
-        mysqli_stmt_execute($userStmt);
-        $userResult = mysqli_stmt_get_result($userStmt);
-        $userRow = mysqli_fetch_assoc($userResult);
-        mysqli_stmt_close($userStmt);
+        // Get the current primary email to make sure secondary != primary
+        $primaryStmt = mysqli_prepare($conn, 'SELECT email FROM USER WHERE user_id = ?');
+        mysqli_stmt_bind_param($primaryStmt, 'i', $userId);
+        mysqli_stmt_execute($primaryStmt);
+        $primaryResult = mysqli_stmt_get_result($primaryStmt);
+        $primaryRow = mysqli_fetch_assoc($primaryResult);
+        mysqli_stmt_close($primaryStmt);
 
-        if (!$userRow || !password_verify($currentPassword, $userRow['password'])) {
-            $errors[] = 'Current password is incorrect.';
+        if ($primaryRow && strcasecmp($primaryRow['email'], $secondaryEmail) === 0) {
+            $errors[] = 'Secondary email must be different from your primary email.';
         }
 
         if (empty($errors)) {
-            $checkStmt = mysqli_prepare($conn, 'SELECT user_id FROM USER WHERE email = ? AND user_id != ?');
-            mysqli_stmt_bind_param($checkStmt, 'si', $newEmail, $userId);
+            // Must not already be in use as ANY email — primary or
+            // secondary — belonging to a different user.
+            $checkStmt = mysqli_prepare($conn, 'SELECT user_id FROM USER WHERE (email = ? OR secondary_email = ?) AND user_id != ?');
+            mysqli_stmt_bind_param($checkStmt, 'ssi', $secondaryEmail, $secondaryEmail, $userId);
             mysqli_stmt_execute($checkStmt);
             $checkResult = mysqli_stmt_get_result($checkStmt);
             if (mysqli_fetch_assoc($checkResult)) {
-                $errors[] = 'That email is already in use by another account.';
+                $errors[] = 'That email is already in use.';
             }
             mysqli_stmt_close($checkStmt);
         }
 
         if (empty($errors)) {
-            // Changing email resets verification — the new address
-            // hasn't been proven yet, so email_verified_at goes back
-            // to NULL, same state a brand-new registration starts in.
-            $stmt = mysqli_prepare($conn, 'UPDATE USER SET email = ?, email_verified_at = NULL WHERE user_id = ?');
-            mysqli_stmt_bind_param($stmt, 'si', $newEmail, $userId);
+            // No re-verification, no login impact — primary email and
+            // email_verified_at are untouched by this action entirely.
+            $stmt = mysqli_prepare($conn, 'UPDATE USER SET secondary_email = ? WHERE user_id = ?');
+            mysqli_stmt_bind_param($stmt, 'si', $secondaryEmail, $userId);
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            $nameForEmail = $_SESSION['name'] ?? '';
-            $token = createEmailVerificationToken($conn, $userId);
-            sendVerificationEmail($newEmail, $nameForEmail, $token);
-
-            // Force logout — leaving the session active would let the
-            // account keep working on an unverified email indefinitely,
-            // which defeats the purpose of verification entirely.
-            $_SESSION = [];
-            session_destroy();
-            header('Location: /modules/auth/login.php?email_changed=1');
+            header('Location: settings.php?success=secondary_email');
             exit;
         }
     }
@@ -119,18 +110,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: settings.php?success=password');
             exit;
         }
-    }
-
-    if ($action === 'update_preferences') {
-        $notificationsEnabled = isset($_POST['notifications_enabled']) ? 1 : 0;
-
-        $stmt = mysqli_prepare($conn, 'UPDATE USER SET notifications_enabled = ? WHERE user_id = ?');
-        mysqli_stmt_bind_param($stmt, 'ii', $notificationsEnabled, $userId);
-        mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-
-        header('Location: settings.php?success=preferences');
-        exit;
     }
 
       if ($action === 'delete_account') {
@@ -185,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
 }
 
-$userStmt = mysqli_prepare($conn, 'SELECT name, email, notifications_enabled, email_verified_at FROM USER WHERE user_id = ?');
+$userStmt = mysqli_prepare($conn, 'SELECT name, email, secondary_email, email_verified_at FROM USER WHERE user_id = ?');
 mysqli_stmt_bind_param($userStmt, 'i', $userId);
 mysqli_stmt_execute($userStmt);
 $userResult = mysqli_stmt_get_result($userStmt);
@@ -238,25 +217,23 @@ mysqli_stmt_close($userStmt);
         <h2 class="section-heading">Email</h2>
         <div class="auth-card settings-card">
           <p class="settings-current-value">
-            Current: <?php echo htmlspecialchars($user['email']); ?>
+            Primary: <?php echo htmlspecialchars($user['email']); ?>
             <?php if ($user['email_verified_at']): ?>
               <span class="badge-good">Verified</span>
             <?php else: ?>
               <span class="badge-bad">Not verified</span>
             <?php endif; ?>
           </p>
+          <?php if (!empty($user['secondary_email'])): ?>
+            <p class="settings-current-value">Secondary: <?php echo htmlspecialchars($user['secondary_email']); ?></p>
+          <?php endif; ?>
           <form method="POST" action="settings.php">
-            <input type="hidden" name="action" value="change_email">
+            <input type="hidden" name="action" value="add_secondary_email">
             <div class="field">
-              <label class="settings-label">New email</label>
-              <input type="email" name="email" required>
+              <label class="settings-label">Secondary email</label>
+              <input type="email" name="secondary_email" value="<?php echo htmlspecialchars($user['secondary_email'] ?? ''); ?>" required>
             </div>
-            <div class="field">
-              <label class="settings-label">Current password (to confirm this change)</label>
-              <input type="password" name="current_password_email" required>
-            </div>
-            <p class="settings-hint">Changing your email will sign you out — you'll need to verify the new address before logging back in.</p>
-            <button type="submit" class="btn-primary btn-danger">Change email</button>
+            <button type="submit" class="btn-primary">Save secondary email</button>
           </form>
         </div>
       </div>
@@ -279,21 +256,6 @@ mysqli_stmt_close($userStmt);
               <input type="password" name="confirm_password" required minlength="8">
             </div>
             <button type="submit" class="btn-primary">Change password</button>
-          </form>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="section-heading">Preferences</h2>
-        <div class="auth-card settings-card">
-          <form method="POST" action="settings.php">
-            <input type="hidden" name="action" value="update_preferences">
-            <div class="field field-checkbox">
-              <input type="checkbox" name="notifications_enabled" id="notifications_enabled" class="checkbox-input" <?php echo $user['notifications_enabled'] ? 'checked' : ''; ?>>
-              <label for="notifications_enabled" class="checkbox-label">Enable reminder notifications</label>
-            </div>
-            <p class="settings-hint">Turning this off stops reminder notifications even if your browser has permission granted.</p>
-            <button type="submit" class="btn-primary">Save preferences</button>
           </form>
         </div>
       </div>

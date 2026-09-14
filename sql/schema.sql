@@ -3,6 +3,7 @@ CREATE TABLE USER (
   user_id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(150) NOT NULL UNIQUE,
+  secondary_email VARCHAR(150) DEFAULT NULL,
   password VARCHAR(255) NOT NULL,
   notifications_enabled TINYINT(1) NOT NULL DEFAULT 1,
   email_verified_at TIMESTAMP NULL DEFAULT NULL,
@@ -102,14 +103,17 @@ CREATE TABLE IF NOT EXISTS REMINDER (
     FOREIGN KEY (subtask_id) REFERENCES SUBTASK(subtask_id) ON DELETE CASCADE
 );
 
--- CALENDAR_EVENT table (references SUBTASK and HABIT_LOG tables)
+-- CALENDAR_EVENT table (references USER, SUBTASK, and HABIT_LOG tables)
 CREATE TABLE IF NOT EXISTS CALENDAR_EVENT (
     event_id INT AUTO_INCREMENT PRIMARY KEY,
-    subtask_id INT NOT NULL,
+    user_id INT NOT NULL,
+    subtask_id INT NULL,
+    habit_id INT NULL,
     label VARCHAR(255) NOT NULL,
     event_date DATE NOT NULL,
     event_type VARCHAR(50) NOT NULL,
     ref_id INT NULL,
+    FOREIGN KEY (user_id) REFERENCES USER(user_id) ON DELETE CASCADE,
     FOREIGN KEY (subtask_id) REFERENCES SUBTASK(subtask_id) ON DELETE CASCADE,
     FOREIGN KEY (ref_id) REFERENCES HABIT_LOG(log_id) ON DELETE CASCADE
 );

@@ -82,10 +82,6 @@ habit-track/
 │   │   ├── register.php
 │   │   ├── resend-verification.php
 │   │   └── verify-email.php
-│   ├── admin/
-│   │   ├── dashboard.php
-│   │   ├── login.php
-│   │   └── logout.php
 │   ├── calendar/
 │   │   ├── Calendar.php
 │   │   ├── Calendar.css
@@ -139,7 +135,6 @@ The stack includes:
 | Habit Track | <http://localhost:8080> | PHP application |
 | phpMyAdmin | <http://localhost:8081> | Database administration |
 | Mailpit | <http://localhost:8025> | Local email inbox |
-| Admin panel | <http://localhost:8080/modules/admin/login.php> | User verification and Mailpit link |
 | MySQL | `localhost:3307` | Database access from the host |
 
 The MySQL database is initialized from `sql/schema.sql` the first time the database volume is created. To recreate the database from the schema, remove the existing volume before starting the stack again:
@@ -160,17 +155,6 @@ docker compose up --build
 4. Configure the database environment variables used by `includes/db.php`, then serve the repository root through Apache.
 
 The Docker development credentials are `root` / `root`. Do not reuse these credentials in a production deployment.
-
-### Admin panel
-
-Open <http://localhost:8080/modules/admin/login.php> to access the admin panel. The Docker development credentials are:
-
-```text
-Email: Singhsamir515@gmail.com
-Password: 1234567890
-```
-
-The admin panel can list registered users, manually verify an email address, resend a verification email through Mailpit, and open the Mailpit inbox. Change `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `docker-compose.yml` before using the application outside local development.
 
 ## Email Verification
 

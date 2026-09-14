@@ -21,6 +21,7 @@ $ddlStatements = [
         user_id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         email VARCHAR(150) NOT NULL UNIQUE,
+        secondary_email VARCHAR(150) DEFAULT NULL,
         password VARCHAR(255) NOT NULL,
         notifications_enabled TINYINT(1) NOT NULL DEFAULT 1,
         email_verified_at TIMESTAMP NULL DEFAULT NULL,
@@ -105,11 +106,14 @@ $ddlStatements = [
     )",
     "CREATE TABLE IF NOT EXISTS CALENDAR_EVENT (
         event_id INT AUTO_INCREMENT PRIMARY KEY,
-        subtask_id INT NOT NULL,
+        user_id INT NOT NULL,
+        subtask_id INT NULL,
+        habit_id INT NULL,
         label VARCHAR(255) NOT NULL,
         event_date DATE NOT NULL,
         event_type VARCHAR(50) NOT NULL,
         ref_id INT NULL,
+        FOREIGN KEY (user_id) REFERENCES USER(user_id) ON DELETE CASCADE,
         FOREIGN KEY (subtask_id) REFERENCES SUBTASK(subtask_id) ON DELETE CASCADE,
         FOREIGN KEY (ref_id) REFERENCES HABIT_LOG(log_id) ON DELETE CASCADE
     )",
@@ -120,6 +124,48 @@ foreach ($ddlStatements as $sql) {
     if ($result === false) {
         error_log('DB schema creation failed: ' . mysqli_error($conn) . ' :: ' . $sql);
         die('A system error occurred while initializing the database.');
+    }
+}
+
+$calendarUserIdColumn = mysqli_query($conn, "SHOW COLUMNS FROM CALENDAR_EVENT LIKE 'user_id'");
+if ($calendarUserIdColumn && mysqli_num_rows($calendarUserIdColumn) === 0) {
+    $alterResult = mysqli_query(
+        $conn,
+        'ALTER TABLE CALENDAR_EVENT ADD COLUMN user_id INT NOT NULL AFTER event_id'
+    );
+
+    if ($alterResult === false) {
+        error_log('DB schema migration failed: ' . mysqli_error($conn));
+        die('A system error occurred while updating the database.');
+    }
+}
+
+$calendarHabitIdColumn = mysqli_query($conn, "SHOW COLUMNS FROM CALENDAR_EVENT LIKE 'habit_id'");
+if ($calendarHabitIdColumn && mysqli_num_rows($calendarHabitIdColumn) === 0) {
+    $alterResult = mysqli_query(
+        $conn,
+        'ALTER TABLE CALENDAR_EVENT ADD COLUMN habit_id INT NULL AFTER subtask_id'
+    );
+
+    if ($alterResult === false) {
+        error_log('DB schema migration failed: ' . mysqli_error($conn));
+        die('A system error occurred while updating the database.');
+    }
+}
+
+$calendarSubtaskColumn = mysqli_query($conn, "SHOW COLUMNS FROM CALENDAR_EVENT LIKE 'subtask_id'");
+if ($calendarSubtaskColumn && mysqli_num_rows($calendarSubtaskColumn) > 0) {
+    $calendarSubtaskDefinition = mysqli_fetch_assoc($calendarSubtaskColumn);
+    if ($calendarSubtaskDefinition && $calendarSubtaskDefinition['Null'] !== 'YES') {
+        $alterResult = mysqli_query(
+            $conn,
+            'ALTER TABLE CALENDAR_EVENT MODIFY COLUMN subtask_id INT NULL'
+        );
+
+        if ($alterResult === false) {
+            error_log('DB schema migration failed: ' . mysqli_error($conn));
+            die('A system error occurred while updating the database.');
+        }
     }
 }
 
@@ -136,6 +182,19 @@ if ($userColumnsResult && mysqli_num_rows($userColumnsResult) === 0) {
     }
 
     mysqli_query($conn, 'UPDATE USER SET email_verified_at = COALESCE(email_verified_at, created_at, NOW())');
+}
+
+$secondaryEmailColumn = mysqli_query($conn, "SHOW COLUMNS FROM USER LIKE 'secondary_email'");
+if ($secondaryEmailColumn && mysqli_num_rows($secondaryEmailColumn) === 0) {
+    $alterResult = mysqli_query(
+        $conn,
+        'ALTER TABLE USER ADD COLUMN secondary_email VARCHAR(150) DEFAULT NULL AFTER email'
+    );
+
+    if ($alterResult === false) {
+        error_log('DB schema migration failed: ' . mysqli_error($conn));
+        die('A system error occurred while updating the database.');
+    }
 }
 
 $notificationsColumnResult = mysqli_query($conn, "SHOW COLUMNS FROM USER LIKE 'notifications_enabled'");
