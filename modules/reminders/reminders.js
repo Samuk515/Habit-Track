@@ -23,6 +23,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const reminders = window.ACTIVE_REMINDERS || [];
     const notificationsEnabled = window.NOTIFICATIONS_ENABLED !== false;
     const notificationsSupported = 'Notification' in window;
+
+    if (window.NOTIFICATIONS_ENABLED === false) {
+        if (status) status.textContent = 'Notifications are disabled in Settings.';
+        if (btn) btn.disabled = true;
+        return;
+    }
+
     const notified = new Set();
 
     const updateStatus = (msg) => {

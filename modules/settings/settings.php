@@ -24,8 +24,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
 
-            // Keep the session's cached name in sync — dashboard.php
-            // reads $_SESSION['name'] directly for the welcome message.
             $_SESSION['name'] = $name;
 
             header('Location: settings.php?success=name');
@@ -40,7 +38,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Please enter a valid email address.';
         }
 
-        // Get the current primary email to make sure secondary != primary
         $primaryStmt = mysqli_prepare($conn, 'SELECT email FROM USER WHERE user_id = ?');
         mysqli_stmt_bind_param($primaryStmt, 'i', $userId);
         mysqli_stmt_execute($primaryStmt);
@@ -53,8 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (empty($errors)) {
-            // Must not already be in use as ANY email — primary or
-            // secondary — belonging to a different user.
             $checkStmt = mysqli_prepare($conn, 'SELECT user_id FROM USER WHERE (email = ? OR secondary_email = ?) AND user_id != ?');
             mysqli_stmt_bind_param($checkStmt, 'ssi', $secondaryEmail, $secondaryEmail, $userId);
             mysqli_stmt_execute($checkStmt);
@@ -66,8 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (empty($errors)) {
-            // No re-verification, no login impact — primary email and
-            // email_verified_at are untouched by this action entirely.
             $stmt = mysqli_prepare($conn, 'UPDATE USER SET secondary_email = ? WHERE user_id = ?');
             mysqli_stmt_bind_param($stmt, 'si', $secondaryEmail, $userId);
             mysqli_stmt_execute($stmt);
@@ -112,56 +105,111 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-      if ($action === 'delete_account') {
+    if ($action === 'update_preferences') {
+        $notificationsEnabled = isset($_POST['notifications_enabled']) ? 1 : 0;
+
+        $stmt = mysqli_prepare($conn, 'UPDATE USER SET notifications_enabled = ? WHERE user_id = ?');
+        mysqli_stmt_bind_param($stmt, 'ii', $notificationsEnabled, $userId);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
+
+        header('Location: settings.php?success=preferences');
+        exit;
+    }
+
+    if ($action === 'deactivate_account') {
+        $currentPassword = $_POST['deactivate_password'] ?? '';
+
         if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
-          $errors[] = 'Your session expired. Please reload the page and try again.';
+            $errors[] = 'Your session expired. Please reload the page and try again.';
         }
 
         if (empty($errors)) {
-          $currentPassword = $_POST['delete_password'] ?? '';
-          $passwordStmt = mysqli_prepare($conn, 'SELECT password FROM USER WHERE user_id = ?');
-          mysqli_stmt_bind_param($passwordStmt, 'i', $userId);
-          mysqli_stmt_execute($passwordStmt);
-          $passwordResult = mysqli_stmt_get_result($passwordStmt);
-          $passwordRow = mysqli_fetch_assoc($passwordResult);
-          mysqli_stmt_close($passwordStmt);
+            $passwordStmt = mysqli_prepare($conn, 'SELECT password FROM USER WHERE user_id = ?');
+            mysqli_stmt_bind_param($passwordStmt, 'i', $userId);
+            mysqli_stmt_execute($passwordStmt);
+            $passwordResult = mysqli_stmt_get_result($passwordStmt);
+            $passwordRow = mysqli_fetch_assoc($passwordResult);
+            mysqli_stmt_close($passwordStmt);
 
-          if (!$passwordRow || !password_verify($currentPassword, $passwordRow['password'])) {
-            $errors[] = 'Current password is incorrect.';
-          }
+            if (!$passwordRow || !password_verify($currentPassword, $passwordRow['password'])) {
+                $errors[] = 'Current password is incorrect.';
+            }
         }
 
         if (empty($errors)) {
-          mysqli_begin_transaction($conn);
-          $reminderStmt = mysqli_prepare($conn, 'DELETE FROM REMINDER WHERE user_id = ?');
-          mysqli_stmt_bind_param($reminderStmt, 'i', $userId);
-          mysqli_stmt_execute($reminderStmt);
-          mysqli_stmt_close($reminderStmt);
+            mysqli_begin_transaction($conn);
+            $cascadeOk = true;
 
-          $deleteStmt = mysqli_prepare($conn, 'DELETE FROM USER WHERE user_id = ?');
-          mysqli_stmt_bind_param($deleteStmt, 'i', $userId);
-          mysqli_stmt_execute($deleteStmt);
-          $deleted = mysqli_stmt_affected_rows($deleteStmt) === 1;
-          mysqli_stmt_close($deleteStmt);
+            $steps = [
+                'DELETE FROM CALENDAR_EVENT WHERE user_id = ?',
+                'DELETE FROM REMINDER WHERE user_id = ?',
+                'DELETE FROM Bad_Habit_Progress WHERE log_id IN (
+                    SELECT log_id FROM HABIT_LOG WHERE habit_id IN (
+                        SELECT habit_id FROM HABIT WHERE category_id IN (
+                            SELECT category_id FROM CATEGORY WHERE user_id = ?
+                        )
+                    )
+                )',
+                'DELETE FROM SUBTASK WHERE habit_id IN (
+                    SELECT habit_id FROM HABIT WHERE category_id IN (
+                        SELECT category_id FROM CATEGORY WHERE user_id = ?
+                    )
+                )',
+                'DELETE FROM HABIT_LOG WHERE habit_id IN (
+                    SELECT habit_id FROM HABIT WHERE category_id IN (
+                        SELECT category_id FROM CATEGORY WHERE user_id = ?
+                    )
+                )',
+                'DELETE FROM STREAK WHERE habit_id IN (
+                    SELECT habit_id FROM HABIT WHERE category_id IN (
+                        SELECT category_id FROM CATEGORY WHERE user_id = ?
+                    )
+                )',
+                'DELETE FROM HABIT WHERE category_id IN (
+                    SELECT category_id FROM CATEGORY WHERE user_id = ?
+                )',
+                'DELETE FROM CATEGORY WHERE user_id = ?',
+                'DELETE FROM EMAIL_VERIFICATION WHERE user_id = ?',
+            ];
 
-          if ($deleted) {
-            mysqli_commit($conn);
-            $_SESSION = [];
-
-            if (ini_get('session.use_cookies')) {
-              $params = session_get_cookie_params();
-              setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+            foreach ($steps as $sql) {
+                $stmt = mysqli_prepare($conn, $sql);
+                mysqli_stmt_bind_param($stmt, 'i', $userId);
+                if (!mysqli_stmt_execute($stmt)) {
+                    $cascadeOk = false;
+                }
+                mysqli_stmt_close($stmt);
+                if (!$cascadeOk) {
+                    break;
+                }
             }
 
-            session_destroy();
-            header('Location: /modules/auth/login.php?account_deleted=1');
-            exit;
-          }
+            if ($cascadeOk) {
+                $finalStmt = mysqli_prepare($conn, 'DELETE FROM USER WHERE user_id = ?');
+                mysqli_stmt_bind_param($finalStmt, 'i', $userId);
+                $cascadeOk = mysqli_stmt_execute($finalStmt) && mysqli_stmt_affected_rows($finalStmt) === 1;
+                mysqli_stmt_close($finalStmt);
+            }
 
-          mysqli_rollback($conn);
-          $errors[] = 'Unable to delete your account. Please try again.';
+            if ($cascadeOk) {
+                mysqli_commit($conn);
+
+                $_SESSION = [];
+                if (ini_get('session.use_cookies')) {
+                    $params = session_get_cookie_params();
+                    setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+                }
+                session_destroy();
+
+                header('Location: /modules/auth/login.php?account_deleted=1');
+                exit;
+            }
+
+            mysqli_rollback($conn);
+            $errors[] = 'Unable to deactivate your account. Please try again.';
         }
-      }
+    }
 }
 
 $userStmt = mysqli_prepare($conn, 'SELECT name, email, secondary_email, email_verified_at FROM USER WHERE user_id = ?');
@@ -264,14 +312,14 @@ mysqli_stmt_close($userStmt);
         <h2 class="section-heading">Delete Account</h2>
         <div class="auth-card settings-card">
           <p class="settings-hint">This permanently deletes your account, habits, logs, reminders, and calendar activity.</p>
-          <form method="POST" action="settings.php" onsubmit="return confirm('Delete your account and all of its data permanently?');">
-            <input type="hidden" name="action" value="delete_account">
+          <form method="POST" action="settings.php" onsubmit="return confirm('Deactivate your account? This cannot be undone.');">
+            <input type="hidden" name="action" value="deactivate_account">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generateCsrfToken()); ?>">
             <div class="field">
-              <label class="settings-label" for="delete_password">Current password</label>
-              <input type="password" name="delete_password" id="delete_password" required>
+              <label class="settings-label" for="deactivate_password">Current password</label>
+              <input type="password" name="deactivate_password" id="deactivate_password" required>
             </div>
-            <button type="submit" class="btn-primary btn-danger">Delete my account</button>
+            <button type="submit" class="btn-primary btn-danger">Deactivate my account</button>
           </form>
         </div>
       </div>
