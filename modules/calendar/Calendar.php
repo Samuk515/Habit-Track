@@ -2,20 +2,13 @@
 declare(strict_types=1);
 require __DIR__ . '/../../includes/auth.php';
 requireLogin();
+require __DIR__ . '/../../includes/csrf.php';
+require __DIR__ . '/../../includes/functions.php';
 require __DIR__ . '/../../includes/db.php';
 
 $userId = (int) $_SESSION['user_id'];
 
-$habitOptStmt = mysqli_prepare($conn, 'SELECT HABIT.habit_id, HABIT.habit_name
-    FROM HABIT
-    INNER JOIN CATEGORY ON HABIT.category_id = CATEGORY.category_id
-    WHERE CATEGORY.user_id = ?
-    ORDER BY HABIT.habit_name');
-mysqli_stmt_bind_param($habitOptStmt, 'i', $userId);
-mysqli_stmt_execute($habitOptStmt);
-$habitOptResult = mysqli_stmt_get_result($habitOptStmt);
-$habitOptions = mysqli_fetch_all($habitOptResult, MYSQLI_ASSOC);
-mysqli_stmt_close($habitOptStmt);
+$csrfToken = generateCsrfToken();
 
 $errors = [];
 
@@ -23,41 +16,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'add_milestone') {
-        $milestoneHabitId = $_POST['habit_id'] ?? '';
-        $label = trim($_POST['label'] ?? '');
+      if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        $_SESSION['flash_error'] = 'Invalid request. Please try again.';
+        header('Location: calendar.php');
+        exit;
+      }
+
+      $title = $_POST['title'] ?? '';
         $eventDate = $_POST['event_date'] ?? '';
+      $description = $_POST['description'] ?? null;
+      $result = add_calendar_milestone($conn, $userId, $eventDate, $title, $description);
 
-        $ownsHabit = false;
-        foreach ($habitOptions as $opt) {
-            if ((string) $opt['habit_id'] === (string) $milestoneHabitId) {
-                $ownsHabit = true;
-                break;
-            }
-        }
-        if (!$ownsHabit) {
-            $errors[] = 'Please select a valid habit.';
-        }
-
-        if ($label === '') {
-            $errors[] = 'Please enter a label for this milestone.';
-        }
-
-        $dateObj = DateTime::createFromFormat('Y-m-d', $eventDate);
-        if (!$dateObj || $dateObj->format('Y-m-d') !== $eventDate) {
-            $errors[] = 'Please enter a valid date.';
-        }
-
-        if (empty($errors)) {
-            $milestoneHabitId = (int) $milestoneHabitId;
-
-            $stmt = mysqli_prepare($conn, "INSERT INTO CALENDAR_EVENT (user_id, habit_id, label, event_date, event_type) VALUES (?, ?, ?, ?, 'milestone')");
-            mysqli_stmt_bind_param($stmt, 'iiss', $userId, $milestoneHabitId, $label, $eventDate);
-            mysqli_stmt_execute($stmt);
-            mysqli_stmt_close($stmt);
-
-            header('Location: calendar.php?success=add');
-            exit;
-        }
+      $_SESSION[$result['success'] ? 'flash_success' : 'flash_error'] = $result['success']
+        ? 'Milestone added.'
+        : $result['error'];
+      header('Location: calendar.php' . ($result['success'] ? '?success=add' : ''));
+      exit;
     }
 
     if ($action === 'delete_milestone') {
@@ -99,7 +73,8 @@ $eventsForJs = array_map(function ($e) {
     return [
         'date' => $e['event_date'],
         'label' => $e['label'],
-        'habit' => $e['habit_name'],
+      'habit' => $e['habit_name'] ?: 'Manual milestone',
+      'description' => $e['description'] ?? '',
         'type' => $e['event_type'],
     ];
 }, $allEvents);
@@ -147,19 +122,15 @@ $eventsForJs = array_map(function ($e) {
         <div class="auth-card">
           <form method="POST" action="calendar.php">
             <input type="hidden" name="action" value="add_milestone">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
             <div class="field">
-              <select name="habit_id" class="select-input" required>
-                <option value="">Select habit</option>
-                <?php foreach ($habitOptions as $opt): ?>
-                  <option value="<?php echo $opt['habit_id']; ?>"><?php echo htmlspecialchars($opt['habit_name']); ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-            <div class="field">
-              <input type="text" name="label" placeholder="Milestone (e.g. Hit 30-day streak)" required>
+              <input type="text" name="title" maxlength="100" placeholder="Milestone (e.g. Hit 30-day streak)" required>
             </div>
             <div class="field">
               <input type="date" name="event_date" required>
+            </div>
+            <div class="field">
+              <textarea name="description" placeholder="Description (optional)"></textarea>
             </div>
             <button type="submit" class="btn-primary">Add Milestone</button>
           </form>
@@ -183,9 +154,12 @@ $eventsForJs = array_map(function ($e) {
             <?php foreach ($allEvents as $e): ?>
               <tr>
                 <td><?php echo htmlspecialchars($e['event_date']); ?></td>
-                <td><?php echo htmlspecialchars($e['habit_name']); ?></td>
+                <td><?php echo htmlspecialchars($e['habit_name'] ?: 'Manual milestone'); ?></td>
                 <td>
                   <?php echo htmlspecialchars($e['label']); ?>
+                  <?php if (!empty($e['description'])): ?>
+                    <br><small><?php echo htmlspecialchars($e['description']); ?></small>
+                  <?php endif; ?>
                   <?php if ($e['event_type'] === 'milestone'): ?>
                     <span class="badge-milestone">Milestone</span>
                   <?php endif; ?>

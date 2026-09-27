@@ -6,6 +6,36 @@ function redirect(string $url): void {
     exit;
 }
 
+function add_calendar_milestone(mysqli $conn, int $userId, string $eventDate, string $title, ?string $description = null): array
+{
+    $title = trim($title);
+    if ($title === '' || strlen($title) > 100) {
+        return ['success' => false, 'error' => 'Title is required (max 100 characters).'];
+    }
+
+    $dateObj = DateTime::createFromFormat('Y-m-d', $eventDate);
+    if (!$dateObj || $dateObj->format('Y-m-d') !== $eventDate) {
+        return ['success' => false, 'error' => 'Invalid date.'];
+    }
+
+    $description = $description !== null && trim($description) !== ''
+        ? trim($description)
+        : null;
+
+    $stmt = mysqli_prepare($conn, "INSERT INTO CALENDAR_EVENT (user_id, habit_id, subtask_id, label, event_date, description, event_type) VALUES (?, NULL, NULL, ?, ?, ?, 'milestone')");
+    if (!$stmt) {
+        return ['success' => false, 'error' => 'Database error.'];
+    }
+
+    mysqli_stmt_bind_param($stmt, 'isss', $userId, $title, $eventDate, $description);
+    $ok = mysqli_stmt_execute($stmt);
+    mysqli_stmt_close($stmt);
+
+    return $ok
+        ? ['success' => true]
+        : ['success' => false, 'error' => 'Could not save milestone.'];
+}
+
 function computeStreak(array $logDates, string $targetType, string $now = 'today'): array
 {
     $longestStreak = 0;

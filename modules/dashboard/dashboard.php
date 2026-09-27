@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // this walks HABIT -> CATEGORY -> user_id, same JOIN pattern
         // used everywhere else below HABIT in the schema.
         if (empty($errors)) {
-            $ownerStmt = mysqli_prepare($conn, 'SELECT HABIT.habit_id FROM HABIT
+            $ownerStmt = mysqli_prepare($conn, 'SELECT HABIT.habit_id, HABIT.habit_name FROM HABIT
                 INNER JOIN CATEGORY ON HABIT.category_id = CATEGORY.category_id
                 WHERE HABIT.habit_id = ? AND CATEGORY.user_id = ?');
             mysqli_stmt_bind_param($ownerStmt, 'ii', $habitId, $userId);
@@ -51,6 +51,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($todayLog) {
                 $logId = (int) $todayLog['log_id'];
+              $clearEventStmt = mysqli_prepare($conn, "DELETE FROM CALENDAR_EVENT WHERE ref_id = ? AND event_type = 'habit_log'");
+              mysqli_stmt_bind_param($clearEventStmt, 'i', $logId);
+              mysqli_stmt_execute($clearEventStmt);
+              mysqli_stmt_close($clearEventStmt);
+
                 $deleteStmt = mysqli_prepare($conn, 'DELETE FROM HABIT_LOG WHERE log_id = ?');
                 mysqli_stmt_bind_param($deleteStmt, 'i', $logId);
                 mysqli_stmt_execute($deleteStmt);
@@ -59,7 +64,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $insertStmt = mysqli_prepare($conn, "INSERT INTO HABIT_LOG (habit_id, log_date, status) VALUES (?, CURDATE(), 'done')");
                 mysqli_stmt_bind_param($insertStmt, 'i', $habitId);
                 mysqli_stmt_execute($insertStmt);
+              $logId = (int) mysqli_insert_id($conn);
                 mysqli_stmt_close($insertStmt);
+
+              $eventLabel = $habit['habit_name'];
+              $eventStmt = mysqli_prepare($conn, "INSERT INTO CALENDAR_EVENT (user_id, habit_id, label, event_date, event_type, ref_id) VALUES (?, ?, ?, CURDATE(), 'habit_log', ?)");
+              mysqli_stmt_bind_param($eventStmt, 'iisi', $userId, $habitId, $eventLabel, $logId);
+              mysqli_stmt_execute($eventStmt);
+              mysqli_stmt_close($eventStmt);
             }
 
             calculateAndSaveStreak($conn, $habitId);

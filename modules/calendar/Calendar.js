@@ -41,7 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let html = '<h3>' + key + '</h3><ul class="cal-detail-list">';
         dayEvents.forEach((event) => {
             html += '<li><strong>' + escapeHtml(event.habit) + '</strong> — '
-                + escapeHtml(event.label) + '</li>';
+                + escapeHtml(event.label)
+                + (event.description ? '<br>' + escapeHtml(event.description) : '')
+                + '</li>';
         });
         dayDetail.innerHTML = html + '</ul>';
     }
@@ -72,9 +74,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const dayEvents = eventsByDate[key] || [];
             const cell = document.createElement('button');
             cell.type = 'button';
-            cell.className = 'cal-day';
+            cell.className = 'cal-day ' + (dayEvents.length > 0 ? 'cal-day-done' : 'cal-day-empty-date');
             if (key === todayKey) cell.classList.add('cal-day-today');
-            if (dayEvents.length > 0) cell.classList.add('cal-day-has-events');
             cell.innerHTML = '<span class="cal-day-number">' + day + '</span>'
                 + (dayEvents.length > 0 ? '<span class="cal-day-dot"></span>' : '');
             cell.addEventListener('click', () => showDay(key, dayEvents));

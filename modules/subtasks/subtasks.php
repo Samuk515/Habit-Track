@@ -159,12 +159,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($existing) {
                         $logId = (int) $existing['log_id'];
-                        $updateStmt = mysqli_prepare($conn, "UPDATE HABIT_LOG SET subhabit_id = ?, value = ?, unit = ?, status = 'done' WHERE log_id = ?");
+                        $updateStmt = mysqli_prepare($conn, "UPDATE HABIT_LOG SET subtask_id = ?, value = ?, unit = ?, status = 'done' WHERE log_id = ?");
                         mysqli_stmt_bind_param($updateStmt, 'iisi', $logSubtaskId, $logValue, $logUnit, $logId);
                         mysqli_stmt_execute($updateStmt);
                         mysqli_stmt_close($updateStmt);
                     } else {
-                        $insertStmt = mysqli_prepare($conn, "INSERT INTO HABIT_LOG (habit_id, subhabit_id, log_date, value, unit, status) VALUES (?, ?, CURDATE(), ?, ?, 'done')");
+                        $insertStmt = mysqli_prepare($conn, "INSERT INTO HABIT_LOG (habit_id, subtask_id, log_date, value, unit, status) VALUES (?, ?, CURDATE(), ?, ?, 'done')");
                         mysqli_stmt_bind_param($insertStmt, 'iiis', $habitId, $logSubtaskId, $logValue, $logUnit);
                         mysqli_stmt_execute($insertStmt);
                         mysqli_stmt_close($insertStmt);
@@ -181,8 +181,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $eventLabel .= ' (' . $logValue . ($logUnit ? ' ' . $logUnit : '') . ')';
                     }
 
-                    $insertEventStmt = mysqli_prepare($conn, "INSERT INTO CALENDAR_EVENT (subtask_id, label, event_date, event_type, ref_id) VALUES (?, ?, CURDATE(), 'subtask_log', ?)");
-                    mysqli_stmt_bind_param($insertEventStmt, 'isi', $logSubtaskId, $eventLabel, $logId);
+                    $insertEventStmt = mysqli_prepare($conn, "INSERT INTO CALENDAR_EVENT (user_id, subtask_id, label, event_date, event_type, ref_id) VALUES (?, ?, ?, CURDATE(), 'subtask_log', ?)");
+                    mysqli_stmt_bind_param($insertEventStmt, 'iisi', $userId, $logSubtaskId, $eventLabel, $logId);
                     mysqli_stmt_execute($insertEventStmt);
                     mysqli_stmt_close($insertEventStmt);
 
@@ -209,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (filter_var($logSubtaskId, FILTER_VALIDATE_INT) !== false) {
             $logSubtaskId = (int) $logSubtaskId;
 
-            $findStmt = mysqli_prepare($conn, 'SELECT log_id FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE() AND subhabit_id = ?');
+            $findStmt = mysqli_prepare($conn, 'SELECT log_id FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE() AND subtask_id = ?');
             mysqli_stmt_bind_param($findStmt, 'ii', $habitId, $logSubtaskId);
             mysqli_stmt_execute($findStmt);
             $findResult = mysqli_stmt_get_result($findStmt);
@@ -224,7 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_stmt_close($clearEventStmt);
             }
 
-            $stmt = mysqli_prepare($conn, 'DELETE FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE() AND subhabit_id = ?');
+            $stmt = mysqli_prepare($conn, 'DELETE FROM HABIT_LOG WHERE habit_id = ? AND log_date = CURDATE() AND subtask_id = ?');
             mysqli_stmt_bind_param($stmt, 'ii', $habitId, $logSubtaskId);
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
@@ -288,9 +288,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$todayLogStmt = mysqli_prepare($conn, 'SELECT HABIT_LOG.subhabit_id, HABIT_LOG.value, HABIT_LOG.unit, SUBTASK.subtask_name AS logged_subtask_name
+$todayLogStmt = mysqli_prepare($conn, 'SELECT HABIT_LOG.subtask_id, HABIT_LOG.value, HABIT_LOG.unit, SUBTASK.subtask_name AS logged_subtask_name
     FROM HABIT_LOG
-    LEFT JOIN SUBTASK ON HABIT_LOG.subhabit_id = SUBTASK.subtask_id
+    LEFT JOIN SUBTASK ON HABIT_LOG.subtask_id = SUBTASK.subtask_id
     WHERE HABIT_LOG.habit_id = ? AND HABIT_LOG.log_date = CURDATE()');
 mysqli_stmt_bind_param($todayLogStmt, 'i', $habitId);
 mysqli_stmt_execute($todayLogStmt);
@@ -307,7 +307,7 @@ $subtasks = mysqli_fetch_all($subtaskResult, MYSQLI_ASSOC);
 mysqli_stmt_close($subtaskStmt);
 
 $subtasksForJs = array_map(function ($s) use ($todayLog) {
-    $isLoggedToday = $todayLog && (int) $todayLog['subhabit_id'] === (int) $s['subtask_id'];
+    $isLoggedToday = $todayLog && (int) $todayLog['subtask_id'] === (int) $s['subtask_id'];
     return [
         'id' => (int) $s['subtask_id'],
         'name' => $s['subtask_name'],
@@ -383,7 +383,7 @@ $subtasksForJs = array_map(function ($s) use ($todayLog) {
           </thead>
           <tbody>
             <?php foreach ($subtasks as $s): ?>
-              <?php $isLoggedToday = ($todayLog && (int) $todayLog['subhabit_id'] === (int) $s['subtask_id']); ?>
+              <?php $isLoggedToday = ($todayLog && (int) $todayLog['subtask_id'] === (int) $s['subtask_id']); ?>
               <tr>
                 <td><?php echo htmlspecialchars($s['subtask_name']); ?></td>
                 <td><?php echo $s['description'] ? htmlspecialchars($s['description']) : '—'; ?></td>

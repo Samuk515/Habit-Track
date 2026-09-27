@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS CALENDAR_EVENT (
     habit_id INT NULL,
     label VARCHAR(255) NOT NULL,
     event_date DATE NOT NULL,
+    description VARCHAR(255) NULL,
     event_type VARCHAR(50) NOT NULL,
     ref_id INT NULL,
     FOREIGN KEY (user_id) REFERENCES USER(user_id) ON DELETE CASCADE,

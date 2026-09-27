@@ -476,7 +476,7 @@ $habitsForJs = array_map(function ($h) {
 
           <button type="submit" class="btn-primary">Save changes</button>
         </form>
-      </div>
+      </div> 
 
     </div>
   </div>

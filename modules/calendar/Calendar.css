@@ -62,7 +62,7 @@
 
 .cal-day {
     aspect-ratio: 1;
-    background: var(--bg);
+    background: #ffe3e3;
     border: 1px solid var(--border);
     border-radius: 6px;
     display: flex;
@@ -86,15 +86,21 @@
     font-weight: 700;
 }
 
-.cal-day-has-events {
-    background: #1DD1A122;
+.cal-day-done {
+    background: #d8f5e3;
+    border-color: #43a866;
+}
+
+.cal-day-empty-date {
+    background: #ffe3e3;
+    border-color: #e58b8b;
 }
 
 .cal-day-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #1DD1A1;
+    background: #24964d;
     margin-top: 2px;
 }
 

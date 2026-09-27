@@ -111,6 +111,7 @@ $ddlStatements = [
         habit_id INT NULL,
         label VARCHAR(255) NOT NULL,
         event_date DATE NOT NULL,
+        description VARCHAR(255) NULL,
         event_type VARCHAR(50) NOT NULL,
         ref_id INT NULL,
         FOREIGN KEY (user_id) REFERENCES USER(user_id) ON DELETE CASCADE,
@@ -124,6 +125,19 @@ foreach ($ddlStatements as $sql) {
     if ($result === false) {
         error_log('DB schema creation failed: ' . mysqli_error($conn) . ' :: ' . $sql);
         die('A system error occurred while initializing the database.');
+    }
+}
+
+$calendarDescriptionColumn = mysqli_query($conn, "SHOW COLUMNS FROM CALENDAR_EVENT LIKE 'description'");
+if ($calendarDescriptionColumn && mysqli_num_rows($calendarDescriptionColumn) === 0) {
+    $alterResult = mysqli_query(
+        $conn,
+        'ALTER TABLE CALENDAR_EVENT ADD COLUMN description VARCHAR(255) NULL AFTER event_date'
+    );
+
+    if ($alterResult === false) {
+        error_log('DB schema migration failed: ' . mysqli_error($conn));
+        die('A system error occurred while updating the database.');
     }
 }
 
