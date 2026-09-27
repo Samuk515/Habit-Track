@@ -31,6 +31,7 @@ Habit Track lets users organize habits into categories, break them into subtasks
 - Subtask CRUD with optional flag, reordering, and logging
 - Daily habit logging (dashboard toggle and subtask-level logging with value/unit)
 - Automatic streak calculation (current and longest) on every log change
+- Habit insights dashboard with weekly/monthly completion rates, missed days, streak KPIs, progress charts, and consistency ranking
 - Bad habit progress tracking with value and notes
 - Reminders linked to subtasks (once, daily, weekly) with pause/resume
 - Calendar auto-populated from subtask activity with month grid and activity log

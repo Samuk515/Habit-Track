@@ -48,3 +48,190 @@
 	margin-top: auto;
 }
 
+.insights-section {
+	margin-top: 32px;
+}
+
+.section-heading-row,
+.panel-heading,
+.consistency-row,
+.habit-progress-meta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.section-heading-row {
+	margin-bottom: 14px;
+}
+
+.eyebrow,
+.insights-period,
+.panel-heading p,
+.insight-stat span,
+.insight-stat small,
+.consistency-row span,
+.habit-progress-meta span {
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.eyebrow {
+	margin: 0 0 3px;
+	text-transform: uppercase;
+	letter-spacing: .08em;
+	font-weight: 700;
+}
+
+.insights-section .section-heading {
+	margin: 0;
+}
+
+.insight-summary-grid {
+	display: grid;
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.insight-stat,
+.insight-panel {
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: 10px;
+}
+
+.insight-stat {
+	padding: 14px;
+}
+
+.insight-stat strong {
+	display: block;
+	font-size: 25px;
+	margin: 5px 0 2px;
+	color: var(--purple-dark);
+}
+
+.insights-main-grid {
+	display: grid;
+	grid-template-columns: 1.35fr 1fr;
+	gap: 14px;
+	margin-top: 14px;
+}
+
+.insight-panel {
+	padding: 18px;
+}
+
+.panel-heading {
+	align-items: flex-start;
+	margin-bottom: 18px;
+}
+
+.panel-heading h3 {
+	margin: 0 0 4px;
+	font-size: 15px;
+}
+
+.panel-heading p {
+	margin: 0;
+}
+
+.consistency-panel {
+	min-height: 160px;
+}
+
+.consistency-row {
+	padding: 13px 0;
+	border-top: 1px solid var(--border);
+	flex-wrap: wrap;
+}
+
+.consistency-row strong {
+	margin-left: auto;
+	font-size: 13px;
+}
+
+.consistency-row b {
+	color: #24964d;
+	font-size: 13px;
+}
+
+.habit-progress-panel {
+	margin-top: 14px;
+}
+
+.habit-progress-row + .habit-progress-row {
+	border-top: 1px solid var(--border);
+	margin-top: 14px;
+	padding-top: 14px;
+}
+
+.habit-progress-meta {
+	margin-bottom: 9px;
+}
+
+.habit-progress-meta strong {
+	font-size: 13px;
+}
+
+.progress-bars {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 6px;
+}
+
+.progress-day {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	align-items: center;
+}
+
+.progress-bar {
+	display: block;
+	width: 100%;
+	height: 9px;
+	border-radius: 5px;
+	background: #ffe3e3;
+}
+
+.progress-bar-done {
+	background: #43a866;
+}
+
+.progress-day small {
+	font-size: 10px;
+	color: var(--muted);
+}
+
+@media (max-width: 900px) {
+	.insight-summary-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.insights-main-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 560px) {
+	.insight-summary-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.insight-stat strong {
+		font-size: 21px;
+	}
+
+	.insight-panel {
+		padding: 14px;
+	}
+
+	.habit-progress-meta {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: 3px;
+	}
+}
+
