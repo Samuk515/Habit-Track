@@ -11,14 +11,14 @@ services:
       DB_NAME: habit_track_db
       DB_USER: root
       DB_PASS: root
-      APP_URL: http://localhost:8080
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
-      SMTP_SECURE: ""
-      SMTP_USERNAME: ""
-      SMTP_PASSWORD: ""
-      MAIL_FROM: no-reply@habit-track.local
-      MAIL_FROM_NAME: Habit Track
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@habit-track.local}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Habit Track}
     volumes:
       - ./:/var/www/html
       - /var/www/html/vendor

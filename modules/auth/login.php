@@ -33,7 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Invalid email or password.';
         } elseif ($user['email_verified_at'] === null) {
             $resendUrl = 'resend-verification.php?email=' . urlencode($email);
-            $errors[] = 'Please verify your email before logging in. <a href="' . htmlspecialchars($resendUrl, ENT_QUOTES, 'UTF-8') . '">Resend verification email</a>.';
+            $verifyUrl = 'verify-email.php?email=' . urlencode($email);
+            $errors[] = 'Please verify your email before logging in. <a href="' . htmlspecialchars($verifyUrl, ENT_QUOTES, 'UTF-8') . '">Enter verification code</a> or <a href="' . htmlspecialchars($resendUrl, ENT_QUOTES, 'UTF-8') . '">resend verification email</a>.';
         } else {
             session_regenerate_id(true);
             $_SESSION['user_id'] = $user['user_id'];
@@ -61,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <?php if (isset($_GET['registered'])): ?>
         <div class="auth-success">
-            Account created. Please check your email to verify your account before logging in.
+            Account created. Please check your email, then <a href="verify-email.php">enter the six-digit verification code</a> before logging in.
             <?php if (($_GET['verification_sent'] ?? '') === '0'): ?>
             We could not send the email automatically; check the server logs for the verification link.
             <?php endif; ?>
@@ -102,6 +103,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <button type="submit" id="submit-btn" class="btn-submit">Log in</button>
         </form>
+
+        <p class="auth-switch"><a href="verify-email.php">Verify account with email OTP</a></p>
 
         <p class="auth-switch">Don't have an account? <a href="register.php">Register</a></p>
     </div>

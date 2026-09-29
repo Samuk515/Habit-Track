@@ -141,6 +141,19 @@ if ($calendarDescriptionColumn && mysqli_num_rows($calendarDescriptionColumn) ==
     }
 }
 
+$verificationOtpColumn = mysqli_query($conn, "SHOW COLUMNS FROM EMAIL_VERIFICATION LIKE 'otp_hash'");
+if ($verificationOtpColumn && mysqli_num_rows($verificationOtpColumn) === 0) {
+    $alterResult = mysqli_query(
+        $conn,
+        'ALTER TABLE EMAIL_VERIFICATION ADD COLUMN otp_hash CHAR(64) DEFAULT NULL AFTER token_hash'
+    );
+
+    if ($alterResult === false) {
+        error_log('DB schema migration failed: ' . mysqli_error($conn));
+        die('A system error occurred while updating the database.');
+    }
+}
+
 $calendarUserIdColumn = mysqli_query($conn, "SHOW COLUMNS FROM CALENDAR_EVENT LIKE 'user_id'");
 if ($calendarUserIdColumn && mysqli_num_rows($calendarUserIdColumn) === 0) {
     $alterResult = mysqli_query(

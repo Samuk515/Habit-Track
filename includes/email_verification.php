@@ -11,10 +11,12 @@ function getAppBaseUrl(): string
     return rtrim(getenv('APP_URL') ?: 'http://localhost:8080', '/');
 }
 
-function createEmailVerificationToken(mysqli $conn, int $userId): string
+function createEmailVerificationToken(mysqli $conn, int $userId): array
 {
     $token = bin2hex(random_bytes(32));
+    $code = (string) random_int(100000, 999999);
     $tokenHash = hash('sha256', $token);
+    $codeHash = hash('sha256', $code);
 
     $deleteStmt = mysqli_prepare($conn, 'DELETE FROM EMAIL_VERIFICATION WHERE user_id = ?');
     mysqli_stmt_bind_param($deleteStmt, 'i', $userId);
@@ -23,17 +25,17 @@ function createEmailVerificationToken(mysqli $conn, int $userId): string
 
     $insertStmt = mysqli_prepare(
         $conn,
-        'INSERT INTO EMAIL_VERIFICATION (user_id, token_hash, expires_at, created_at)
-         VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR), NOW())'
+        'INSERT INTO EMAIL_VERIFICATION (user_id, token_hash, otp_hash, expires_at, created_at)
+         VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR), NOW())'
     );
-    mysqli_stmt_bind_param($insertStmt, 'is', $userId, $tokenHash);
+    mysqli_stmt_bind_param($insertStmt, 'iss', $userId, $tokenHash, $codeHash);
     mysqli_stmt_execute($insertStmt);
     mysqli_stmt_close($insertStmt);
 
-    return $token;
+    return ['token' => $token, 'code' => $code];
 }
 
-function sendVerificationEmail(string $email, string $name, string $token): bool
+function sendVerificationEmail(string $email, string $name, string $token, string $code): bool
 {
     $verificationUrl = getAppBaseUrl() . '/modules/auth/verify-email.php?token=' . urlencode($token);
     $mail = new PHPMailer(true);
@@ -68,8 +70,9 @@ function sendVerificationEmail(string $email, string $name, string $token): bool
         $mail->Body = '<p>Hi ' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ',</p>'
             . '<p>Please verify your email address to finish setting up your Habit Track account.</p>'
             . '<p><a href="' . htmlspecialchars($verificationUrl, ENT_QUOTES, 'UTF-8') . '">Verify email address</a></p>'
+            . '<p>If the link does not open, enter this verification code on the app login page: <strong>' . htmlspecialchars($code, ENT_QUOTES, 'UTF-8') . '</strong></p>'
             . '<p>This link expires in 24 hours.</p>';
-        $mail->AltBody = "Hi {$name},\n\nVerify your email address with this link:\n{$verificationUrl}\n\nThis link expires in 24 hours.";
+        $mail->AltBody = "Hi {$name},\n\nVerify your email address with this link:\n{$verificationUrl}\n\nIf the link does not open, enter this verification code on the app login page: {$code}\n\nThis link expires in 24 hours.";
 
         $mail->send();
         return true;

@@ -19,8 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_stmt_close($stmt);
 
         if ($user && $user['email_verified_at'] === null) {
-            $token = createEmailVerificationToken($conn, (int) $user['user_id']);
-            sendVerificationEmail($email, $user['name'], $token);
+            $verification = createEmailVerificationToken($conn, (int) $user['user_id']);
+            sendVerificationEmail($email, $user['name'], $verification['token'], $verification['code']);
         }
 
         $message = 'If that email belongs to an unverified account, a new verification email has been sent.';

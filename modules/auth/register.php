@@ -53,8 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (mysqli_stmt_execute($insertStmt)) {
             $userId = mysqli_insert_id($conn);
             mysqli_stmt_close($insertStmt);
-            $token = createEmailVerificationToken($conn, (int) $userId);
-            $emailSent = sendVerificationEmail($email, $name, $token);
+            $verification = createEmailVerificationToken($conn, (int) $userId);
+            $emailSent = sendVerificationEmail($email, $name, $verification['token'], $verification['code']);
 
             header('Location: /modules/auth/login.php?registered=1&verification_sent=' . ($emailSent ? '1' : '0'));
             exit;

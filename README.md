@@ -161,7 +161,7 @@ The Docker development credentials are `root` / `root`. Do not reuse these crede
 
 New users must verify their email before logging in. The Docker setup uses Mailpit for local email delivery. After registering, open <http://localhost:8025> and click the verification message.
 
-For a non-Docker or production deployment, configure these environment variables in `docker-compose.yml` or your server environment:
+For a non-Docker or production deployment, configure these environment variables in your server environment. When using Docker Compose, put them in a `.env` file next to `docker-compose.yml` so verification emails go to real inboxes instead of the local Mailpit inbox:
 
 ```bash
 APP_URL=http://localhost:8080
@@ -173,6 +173,8 @@ SMTP_PASSWORD=your-smtp-password
 MAIL_FROM=no-reply@example.com
 MAIL_FROM_NAME="Habit Track"
 ```
+
+`APP_URL` must be the URL that the recipient can open. For another user, do not leave it as `http://localhost:8080`; use the application's public HTTPS URL. Restart the web container after changing `.env` with `docker compose up -d --build web`.
 
 `SMTP_SECURE` should be `tls` for a typical port 587 provider. For Mailpit, leave it empty and use port 1025. Never commit real SMTP credentials to the repository.
 
