@@ -22,7 +22,7 @@ Habit Track lets users organize habits into categories, break them into subtasks
 
 ### Implemented
 - Secure user registration (CSRF protection, input validation, password hashing)
-- Email verification for new accounts
+- Email verification for new accounts with Gmail/SMTP delivery, verification links, and six-digit OTP fallback
 - Secure login (session-based auth, generic error messaging, session regeneration)
 - Logout with full session and cookie cleanup
 - Session-protected dashboard with habit overview and streak display
@@ -159,7 +159,9 @@ The Docker development credentials are `root` / `root`. Do not reuse these crede
 
 ## Email Verification
 
-New users must verify their email before logging in. The Docker setup uses Mailpit for local email delivery. After registering, open <http://localhost:8025> and click the verification message.
+New users must verify their email before logging in. The verification email contains both a link and a six-digit OTP. To use the OTP, open the application's **Verify account with email OTP** page, enter the registration email and code, then log in.
+
+For local development, Docker sends email to Mailpit. After registering, open <http://localhost:8025> and open the verification message. The OTP verification page is available at <http://localhost:8080/modules/auth/verify-email.php>.
 
 For a non-Docker or production deployment, configure these environment variables in your server environment. When using Docker Compose, put them in a `.env` file next to `docker-compose.yml` so verification emails go to real inboxes instead of the local Mailpit inbox:
 
@@ -177,6 +179,18 @@ MAIL_FROM_NAME="Habit Track"
 `APP_URL` must be the URL that the recipient can open. For another user, do not leave it as `http://localhost:8080`; use the application's public HTTPS URL. Restart the web container after changing `.env` with `docker compose up -d --build web`.
 
 `SMTP_SECURE` should be `tls` for a typical port 587 provider. For Mailpit, leave it empty and use port 1025. Never commit real SMTP credentials to the repository.
+
+## Project Status
+
+The core Habit Track application is complete, including authentication, Gmail/SMTP email delivery, OTP verification, habits, subtasks, logging, streaks, reminders, calendar integration, and dashboard insights.
+
+### Next Steps
+
+1. Deploy the Docker application to a server with a public HTTPS domain.
+2. Set `APP_URL` to that public domain so verification links work for other users.
+3. Configure production SMTP credentials in the server environment or an ignored `.env` file.
+4. Replace the development MySQL and phpMyAdmin credentials before production use.
+5. Back up the database and test registration, OTP verification, login, password handling, and account recovery on the deployed system.
 
 ## Development
 

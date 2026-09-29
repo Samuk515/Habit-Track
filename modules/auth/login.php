@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once '../../includes/auth.php';
 require_once '../../includes/db.php';
+global $conn;
 
 $errors = [];
 $email = trim($_GET['email'] ?? '');

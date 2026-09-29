@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once '../../includes/db.php';
 require_once '../../includes/email_verification.php';
+global $conn;
 
 $errors = [];
 $name = '';
