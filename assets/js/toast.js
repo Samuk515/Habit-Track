@@ -14,7 +14,9 @@
         delete: 'Deleted successfully.',
         log: 'Log saved.',
         clear_log: 'Log cleared.',
-        toggle_active: 'Reminder toggled.'
+        toggle_active: 'Reminder toggled.',
+        primary_email: 'Primary email updated.',
+        secondary_email: 'Secondary email saved.'
     };
 
     var title = messages[success];

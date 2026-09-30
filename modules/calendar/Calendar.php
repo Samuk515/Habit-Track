@@ -34,13 +34,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       exit;
     }
 
+    if ($action === 'add_event') {
+      if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        $_SESSION['flash_error'] = 'Invalid request. Please try again.';
+        header('Location: calendar.php');
+        exit;
+      }
+
+      $title = trim($_POST['title'] ?? '');
+      $eventDate = $_POST['event_date'] ?? '';
+      $description = trim($_POST['description'] ?? '');
+      $dateObj = DateTime::createFromFormat('Y-m-d', $eventDate);
+      if ($title === '' || strlen($title) > 100) {
+        $errors[] = 'Event title is required (max 100 characters).';
+      }
+      if (!$dateObj || $dateObj->format('Y-m-d') !== $eventDate) {
+        $errors[] = 'Please enter a valid event date.';
+      }
+
+      if (empty($errors)) {
+        $stmt = mysqli_prepare($conn, "INSERT INTO CALENDAR_EVENT (user_id, label, event_date, description, event_type) VALUES (?, ?, ?, ?, 'event')");
+        mysqli_stmt_bind_param($stmt, 'isss', $userId, $title, $eventDate, $description);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
+        header('Location: calendar.php?success=add');
+        exit;
+      }
+    }
+
+    if ($action === 'add_reminder') {
+      if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        $_SESSION['flash_error'] = 'Invalid request. Please try again.';
+        header('Location: calendar.php');
+        exit;
+      }
+
+      $label = trim($_POST['reminder_label'] ?? '');
+      $reminderTime = trim($_POST['reminder_time'] ?? '');
+      $reminderType = $_POST['reminder_type'] ?? '';
+      if ($label === '') {
+        $errors[] = 'Reminder label is required.';
+      }
+      if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $reminderTime)) {
+        $errors[] = 'Please enter a valid reminder time.';
+      } else {
+        $reminderTime .= ':00';
+      }
+      if (!in_array($reminderType, ['once', 'daily', 'weekly'], true)) {
+        $errors[] = 'Please select a valid reminder type.';
+      }
+
+      if (empty($errors)) {
+        $stmt = mysqli_prepare($conn, 'INSERT INTO REMINDER (user_id, subtask_id, label, reminder_time, reminder_type, is_active) VALUES (?, NULL, ?, ?, ?, 1)');
+        mysqli_stmt_bind_param($stmt, 'isss', $userId, $label, $reminderTime, $reminderType);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
+        header('Location: calendar.php?success=reminder');
+        exit;
+      }
+    }
+
     if ($action === 'delete_milestone') {
         $eventId = $_POST['event_id'] ?? '';
 
         if (filter_var($eventId, FILTER_VALIDATE_INT) !== false) {
             $eventId = (int) $eventId;
 
-            $stmt = mysqli_prepare($conn, "DELETE FROM CALENDAR_EVENT WHERE event_id = ? AND user_id = ? AND event_type = 'milestone'");
+            $stmt = mysqli_prepare($conn, "DELETE FROM CALENDAR_EVENT WHERE event_id = ? AND user_id = ? AND event_type IN ('milestone', 'event')");
             mysqli_stmt_bind_param($stmt, 'ii', $eventId, $userId);
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
@@ -51,8 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// DataTables handles pagination client-side now, so this just fetches
-// everything (capped for safety) instead of slicing a page in PHP.
+// The calendar grid and activity table share this event dataset.
 $eventStmt = mysqli_prepare($conn, 'SELECT CALENDAR_EVENT.*,
     SUBTASK.subtask_name,
     COALESCE(HABIT_VIA_SUBTASK.habit_name, HABIT_DIRECT.habit_name) AS habit_name
@@ -61,8 +120,7 @@ $eventStmt = mysqli_prepare($conn, 'SELECT CALENDAR_EVENT.*,
     LEFT JOIN HABIT AS HABIT_VIA_SUBTASK ON SUBTASK.habit_id = HABIT_VIA_SUBTASK.habit_id
     LEFT JOIN HABIT AS HABIT_DIRECT ON CALENDAR_EVENT.habit_id = HABIT_DIRECT.habit_id
     WHERE CALENDAR_EVENT.user_id = ?
-    ORDER BY CALENDAR_EVENT.event_date DESC, CALENDAR_EVENT.event_id DESC
-    LIMIT 2000');
+    ORDER BY CALENDAR_EVENT.event_date DESC, CALENDAR_EVENT.event_id DESC');
 mysqli_stmt_bind_param($eventStmt, 'i', $userId);
 mysqli_stmt_execute($eventStmt);
 $eventResult = mysqli_stmt_get_result($eventStmt);
@@ -84,6 +142,7 @@ $eventsForJs = array_map(function ($e) {
 <head>
   <title>Calendar — Habit Track</title>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/v/dt/dt-3.0.2/datatables.min.css">
   <link rel="stylesheet" href="Calendar.css?v=20260801-3">
 </head>
 <body>
@@ -118,13 +177,13 @@ $eventsForJs = array_map(function ($e) {
       </div>
 
       <div class="settings-section">
-        <h2 class="section-heading">Add a Milestone</h2>
+        <h2 class="section-heading">Add an Event</h2>
         <div class="auth-card">
           <form method="POST" action="calendar.php">
-            <input type="hidden" name="action" value="add_milestone">
+            <input type="hidden" name="action" value="add_event">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
             <div class="field">
-              <input type="text" name="title" maxlength="100" placeholder="Milestone (e.g. Hit 30-day streak)" required>
+              <input type="text" name="title" maxlength="100" placeholder="Event title" required>
             </div>
             <div class="field">
               <input type="date" name="event_date" required>
@@ -132,7 +191,27 @@ $eventsForJs = array_map(function ($e) {
             <div class="field">
               <textarea name="description" placeholder="Description (optional)"></textarea>
             </div>
-            <button type="submit" class="btn-primary">Add Milestone</button>
+            <button type="submit" class="btn-primary">Add Event</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="section-heading">Add a Reminder</h2>
+        <div class="auth-card">
+          <form method="POST" action="calendar.php">
+            <input type="hidden" name="action" value="add_reminder">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+            <div class="field"><input type="text" name="reminder_label" maxlength="255" placeholder="Reminder label" required></div>
+            <div class="field"><input type="time" name="reminder_time" required></div>
+            <div class="field">
+              <select name="reminder_type" class="select-input" required>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="once">Once</option>
+              </select>
+            </div>
+            <button type="submit" class="btn-primary">Add Reminder</button>
           </form>
         </div>
       </div>
@@ -160,8 +239,8 @@ $eventsForJs = array_map(function ($e) {
                   <?php if (!empty($e['description'])): ?>
                     <br><small><?php echo htmlspecialchars($e['description']); ?></small>
                   <?php endif; ?>
-                  <?php if ($e['event_type'] === 'milestone'): ?>
-                    <span class="badge-milestone">Milestone</span>
+                  <?php if (in_array($e['event_type'], ['milestone', 'event'], true)): ?>
+                    <span class="badge-milestone"><?php echo $e['event_type'] === 'milestone' ? 'Milestone' : 'Event'; ?></span>
                   <?php endif; ?>
                 </td>
                 <td class="actions-cell">
@@ -187,8 +266,19 @@ $eventsForJs = array_map(function ($e) {
     window.CALENDAR_EVENTS = <?php echo json_encode($eventsForJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
   </script>
   <script src="Calendar.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+  <script src="https://cdn.datatables.net/v/dt/dt-3.0.2/datatables.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="/assets/js/confirm-delete.js"></script>
   <script src="/assets/js/toast.js"></script>
+  <script>
+    $(function () {
+      $('#calendar-table').DataTable({
+        pageLength: 10,
+        lengthMenu: [10, 25, 50, 100],
+        order: [[0, 'desc']]
+      });
+    });
+  </script>
 </body>
 </html>

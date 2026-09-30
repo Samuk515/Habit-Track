@@ -71,6 +71,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+      if ($action === 'make_secondary_primary') {
+        $stmt = mysqli_prepare($conn, 'SELECT email, secondary_email FROM USER WHERE user_id = ?');
+        mysqli_stmt_bind_param($stmt, 'i', $userId);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
+        $emailRow = mysqli_fetch_assoc($result);
+        mysqli_stmt_close($stmt);
+
+        if (!$emailRow || empty($emailRow['secondary_email'])) {
+          $errors[] = 'Add a secondary email before making it primary.';
+        } else {
+          mysqli_begin_transaction($conn);
+          $newPrimary = $emailRow['secondary_email'];
+          $newSecondary = $emailRow['email'];
+          $swapStmt = mysqli_prepare($conn, 'UPDATE USER SET email = ?, secondary_email = ? WHERE user_id = ?');
+          mysqli_stmt_bind_param($swapStmt, 'ssi', $newPrimary, $newSecondary, $userId);
+          $swapOk = mysqli_stmt_execute($swapStmt);
+          mysqli_stmt_close($swapStmt);
+
+          if ($swapOk) {
+            mysqli_commit($conn);
+            header('Location: settings.php?success=primary_email');
+            exit;
+          }
+
+          mysqli_rollback($conn);
+          $errors[] = 'Unable to make the secondary email primary. Please try again.';
+        }
+      }
+
     if ($action === 'change_password') {
         $currentPassword = $_POST['current_password'] ?? '';
         $newPassword = $_POST['new_password'] ?? '';
@@ -274,6 +304,10 @@ mysqli_stmt_close($userStmt);
           </p>
           <?php if (!empty($user['secondary_email'])): ?>
             <p class="settings-current-value">Secondary: <?php echo htmlspecialchars($user['secondary_email']); ?></p>
+            <form method="POST" action="settings.php" class="inline-form">
+              <input type="hidden" name="action" value="make_secondary_primary">
+              <button type="submit" class="btn-secondary">Make secondary primary</button>
+            </form>
           <?php endif; ?>
           <form method="POST" action="settings.php">
             <input type="hidden" name="action" value="add_secondary_email">
